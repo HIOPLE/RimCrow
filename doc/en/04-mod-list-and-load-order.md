@@ -466,7 +466,7 @@ Before saving:
 - Keep backups for important lists.
 - If you imported an external list, check differences before loading.
 
-For more, see [Backup, Import, and Export](./backup-import-export.md).
+For more, see [Backup, Import, and Export](./06-backup-import-export.md).
 
 ## FAQ
 

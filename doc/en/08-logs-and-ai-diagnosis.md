@@ -186,7 +186,7 @@ Check first:
 - Path case or special characters.
 - Whether texture optimization or cleanup was just performed.
 
-For texture optimization, see [Texture Optimization](./texture-optimization.md).
+For texture optimization, see [Texture Optimization](./07-texture-optimization.md).
 
 ## Privacy And Safety
 

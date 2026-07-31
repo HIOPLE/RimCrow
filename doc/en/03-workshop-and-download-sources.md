@@ -106,7 +106,7 @@ Notes:
 - Scan after downloading so the list updates.
 - Enable **Use manager mods** before using these mods in the game.
 
-For SteamCMD paths and manager mod paths, see [Profiles and Paths](./environment-and-paths.md).
+For SteamCMD paths and manager mod paths, see [Profiles and Paths](./02-environment-and-paths.md).
 
 ## Workshop Search
 

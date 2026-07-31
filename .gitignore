@@ -23,7 +23,7 @@ cache/
 downloads/
 backups/
 logs/
-test/
+local_tools/
 steamcmd/
 steam_agent/
 mods/
@@ -61,3 +61,5 @@ temp/
 frontend/src/shared/branding/private-assets/
 
 /files_tree.txt
+/docs/
+/pack.local.json

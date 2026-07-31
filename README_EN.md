@@ -14,14 +14,14 @@ RimCrow, formerly RimModManager, is a desktop mod manager for **RimWorld**. It b
 
 Chinese docs are the primary source of truth. English docs are maintained as paired user-facing guides for the main workflows.
 
-- First run: see [Quick Start](./doc/en/quick-start.md).
-- Paths and launch: see [Profiles and Paths](./doc/en/environment-and-paths.md).
-- Mod lists and load order: see [Mod List and Load Order](./doc/en/mod-list-and-load-order.md).
-- Auto sort and rules: see [Auto Sort and Rules](./doc/en/auto-sort-and-rules.md).
-- Workshop and download sources: see [Workshop and Download Sources](./doc/en/workshop-and-download-sources.md).
-- Backup, import, and export: see [Backup, Import, and Export](./doc/en/backup-import-export.md).
-- Logs and AI diagnosis: see [Logs and AI Diagnosis](./doc/en/logs-and-ai-diagnosis.md).
-- Texture optimization: see [Texture Optimization](./doc/en/texture-optimization.md).
+- First run: see [Quick Start](./doc/en/01-quick-start.md).
+- Paths and launch: see [Profiles and Paths](./doc/en/02-environment-and-paths.md).
+- Mod lists and load order: see [Mod List and Load Order](./doc/en/04-mod-list-and-load-order.md).
+- Auto sort and rules: see [Auto Sort and Rules](./doc/en/05-auto-sort-and-rules.md).
+- Workshop and download sources: see [Workshop and Download Sources](./doc/en/03-workshop-and-download-sources.md).
+- Backup, import, and export: see [Backup, Import, and Export](./doc/en/06-backup-import-export.md).
+- Logs and AI diagnosis: see [Logs and AI Diagnosis](./doc/en/08-logs-and-ai-diagnosis.md).
+- Texture optimization: see [Texture Optimization](./doc/en/07-texture-optimization.md).
 
 ## Platform Status
 

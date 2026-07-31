@@ -29,7 +29,7 @@ Config/
 Saves/
 ```
 
-For paths, profiles, Steam launch, and Workshop links, see [Profiles and Paths](./environment-and-paths.md).
+For paths, profiles, Steam launch, and Workshop links, see [Profiles and Paths](./02-environment-and-paths.md).
 
 ### 2. Scan Mods
 
@@ -53,7 +53,7 @@ Common actions:
 
 Red and yellow hints usually mean dependency, order, compatibility, or missing-file issues. Handle red errors before launching the game.
 
-For list details, see [Mod List and Load Order](./mod-list-and-load-order.md).
+For list details, see [Mod List and Load Order](./04-mod-list-and-load-order.md).
 
 ### 4. Auto Sort
 
@@ -61,7 +61,7 @@ Click **Auto Sort** to let RimCrow reorder the active list using native mod depe
 
 Auto sort is not a magic "perfect order" button. It gives you a reasonable base order. After sorting, still check issue hints and order differences before deciding whether to adjust by hand.
 
-For auto sorting and rules, see [Auto Sort and Rules](./auto-sort-and-rules.md).
+For auto sorting and rules, see [Auto Sort and Rules](./05-auto-sort-and-rules.md).
 
 ### 5. Save The Load Order
 
@@ -106,7 +106,7 @@ If link sync fails before launch, RimCrow will not continue. Check paths, permis
 4. Load it into the current profile only after the list looks reasonable.
 5. Save and launch.
 
-For backups and import/export, see [Backup, Import, and Export](./backup-import-export.md).
+For backups and import/export, see [Backup, Import, and Export](./06-backup-import-export.md).
 
 ## FAQ
 
