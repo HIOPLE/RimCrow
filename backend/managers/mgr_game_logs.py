@@ -354,19 +354,20 @@ class GameLogManager(BaseLogReader): # 继承基类
             candidates.extend(os.path.join(root, item) for item in filenames)
         return list(dict.fromkeys(candidates))
 
-    def _build_log_path_candidates(self, filename: str) -> list[str]:
+    def _build_log_path_candidates(self, filename: str, *, game_version: str | None = None) -> list[str]:
         normalized_name = os.path.basename(str(filename or "").strip())
         if not normalized_name:
             return []
         if normalized_name.startswith('Player'):
-            return GameManager.get_default_player_log_paths(normalized_name)
+            version = getattr(self.context, "game_version", "") if game_version is None else game_version
+            return GameManager.get_default_player_log_paths(normalized_name, game_version=version)
         if self._is_realtime_log_name(normalized_name):
             return self._build_realtime_log_paths(normalized_name)
         return []
 
-    def resolve_log_file_path(self, filename: str, *, must_exist: bool = True) -> str:
+    def resolve_log_file_path(self, filename: str, *, must_exist: bool = True, game_version: str | None = None) -> str:
         """解析游戏日志路径：Player 固定默认目录，RimCrow_Realtime 跟随当前环境。"""
-        for filepath in self._build_log_path_candidates(filename):
+        for filepath in self._build_log_path_candidates(filename, game_version=game_version):
             if not must_exist or os.path.exists(filepath):
                 return filepath
         return ""
@@ -388,7 +389,7 @@ class GameLogManager(BaseLogReader): # 继承基类
         player_candidates = GameManager.get_default_player_log_paths('Player.log')
         return os.path.dirname(player_candidates[0]) if player_candidates else ""
 
-    def get_log_files_for_root(self, user_data_root: str = "", *, player_only: bool = False):
+    def get_log_files_for_root(self, user_data_root: str = "", *, player_only: bool = False, game_version: str | None = None):
         """
         按指定用户数据根目录解析日志文件。
         主前端仍使用当前活动环境；静默页会把运行环境根目录显式传进来。
@@ -403,7 +404,7 @@ class GameLogManager(BaseLogReader): # 继承基类
             if self._is_realtime_log_name(filename) and normalized_root:
                 filepath = next((path for path in (os.path.join(normalized_root, item) for item in self._realtime_log_aliases(filename)) if os.path.exists(path)), "")
             else:
-                filepath = self.resolve_log_file_path(filename)
+                filepath = self.resolve_log_file_path(filename, game_version=game_version)
             if filepath and os.path.exists(filepath):
                 stat = os.stat(filepath)
                 result.append({
@@ -415,14 +416,14 @@ class GameLogManager(BaseLogReader): # 继承基类
         result.sort(key=lambda x: x['mtime'], reverse=True)
         return result
 
-    def read_log_page_for_root(self, filename, user_data_root: str = "", page=1, page_size=1000):
+    def read_log_page_for_root(self, filename, user_data_root: str = "", page=1, page_size=1000, *, game_version: str | None = None):
         normalized_name = os.path.basename(str(filename or "").strip())
         normalized_root = str(user_data_root or "").strip()
         if self._is_realtime_log_name(normalized_name) and normalized_root:
             self._migrate_legacy_realtime_logs_for_root(normalized_root)
             filepath = next((path for path in (os.path.join(normalized_root, item) for item in self._realtime_log_aliases(normalized_name)) if os.path.exists(path)), "")
         else:
-            filepath = self.resolve_log_file_path(normalized_name)
+            filepath = self.resolve_log_file_path(normalized_name, game_version=game_version)
         if not filepath or not os.path.exists(filepath):
             return {'error': '文件不存在'}
 

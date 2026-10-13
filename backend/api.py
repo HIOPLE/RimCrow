@@ -5506,18 +5506,18 @@ class API:
     #  8. 日志管理 (Log Management)
     # =========================================================================
 
-    def _resolve_game_log_scope(self, profile_scope: str = "active") -> tuple[GameLogManager | None, str, bool]:
+    def _resolve_game_log_scope(self, profile_scope: str = "active") -> tuple[GameLogManager | None, str, bool, str | None]:
         if not self.game_log_mgr:
-            return None, "", False
+            return None, "", False, None
         normalized_scope = str(profile_scope or "active").strip().lower() or "active"
         if normalized_scope != "runtime":
             active_root = str(getattr(getattr(self, "active_context", None), "user_data_path", "") or "").strip()
-            return self.game_log_mgr, active_root, False
+            return self.game_log_mgr, active_root, False, None
 
         game_monitor = getattr(self, "game_monitor", None)
         runtime_session = game_monitor.get_runtime_session() if game_monitor and hasattr(game_monitor, "get_runtime_session") else None
         if runtime_session is None:
-            return self.game_log_mgr, str(getattr(getattr(self, "active_context", None), "user_data_path", "") or "").strip(), False
+            return self.game_log_mgr, str(getattr(getattr(self, "active_context", None), "user_data_path", "") or "").strip(), False, None
         runtime_profile_id = str(getattr(runtime_session, "profile_id", "") or "").strip() or "default"
         player_only = bool(
             getattr(runtime_session, "source", "") == "external"
@@ -5527,9 +5527,11 @@ class API:
         try:
             runtime_context = self.profile_mgr.build_profile_context(runtime_profile_id)
             runtime_root = str(getattr(runtime_context, "user_data_path", "") or "").strip()
+            runtime_version = str(getattr(runtime_context, "game_version", "") or "").strip()
         except Exception:
             runtime_root = ""
-        return self.game_log_mgr, runtime_root, player_only
+            runtime_version = ""
+        return self.game_log_mgr, runtime_root, player_only, runtime_version
 
     def get_log_files(self, log_type='game', profile_scope: str = "active"):
         """ 获取指定类型的日志文件列表 ('app' 或 'game') """
@@ -5537,10 +5539,10 @@ class API:
             if log_type == 'app':
                 files = app_log_reader.get_log_files()
             else:
-                manager, user_data_root, player_only = self._resolve_game_log_scope(profile_scope=profile_scope)
+                manager, user_data_root, player_only, game_version = self._resolve_game_log_scope(profile_scope=profile_scope)
                 if not manager:
                     return ApiResponse.warning(tr("api.log.game_not_ready_for_files", "游戏环境未就绪，无法获取游戏日志"))
-                files = manager.get_log_files_for_root(user_data_root=user_data_root, player_only=player_only)
+                files = manager.get_log_files_for_root(user_data_root=user_data_root, player_only=player_only, game_version=game_version)
                 
             return ApiResponse.success(files)
         except Exception as e:
@@ -5559,10 +5561,10 @@ class API:
             if log_type == 'app':
                 result = app_log_reader.read_log_page(filename, page, page_size)
             else:
-                manager, user_data_root, _player_only = self._resolve_game_log_scope(profile_scope=profile_scope)
+                manager, user_data_root, _player_only, game_version = self._resolve_game_log_scope(profile_scope=profile_scope)
                 if not manager:
                     return ApiResponse.warning(tr("api.log.game_not_ready_for_read", "游戏环境未就绪，无法读取游戏日志"))
-                result = manager.read_log_page_for_root(filename, user_data_root=user_data_root, page=page, page_size=page_size)
+                result = manager.read_log_page_for_root(filename, user_data_root=user_data_root, page=page, page_size=page_size, game_version=game_version)
                 
             if 'error' in result:
                 return ApiResponse.error(
