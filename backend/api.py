@@ -601,7 +601,7 @@ class API:
             first_db=self.is_first_db_init,
         )
         self._native_drop_bound = False
-        self._native_drop_selector = '#backup-drop-zone'
+        self._native_drop_selector = '#app-shell'
         self._native_drop_element = None
         self._native_drop_handler = None
         self._browser_base_url = ""
@@ -1412,14 +1412,12 @@ class API:
 
     def _normalize_native_drop_selector(self, selector: str | None = None) -> str:
         """把前端传入的 id / selector 统一成 pywebview 可直接查询的 CSS 选择器。"""
-        normalized = str(selector or self._native_drop_selector or '').strip() or '#backup-drop-zone'
+        normalized = str(selector or self._native_drop_selector or '').strip() or '#app-shell'
         if normalized.startswith(('#', '.', '[')): return normalized
         return f'#{normalized}'
 
     def _bind_native_drag_drop(self, selector: str | None = None):
-        """
-        把原生 drop 事件只绑定到备份面板本体，减少整页级别监听带来的额外事件噪音。
-        """
+        """把原生 drop 事件绑定到前端提供的全局拖放区域。"""
         if not self._window: return False
 
         normalized_selector = self._normalize_native_drop_selector(selector)
@@ -1468,7 +1466,7 @@ class API:
             payload = json.dumps(full_paths, ensure_ascii=False)
             self._window.evaluate_js(
                 "window.setTimeout(function () {"
-                f"  if (window.__handleNativeBackupDrop) window.__handleNativeBackupDrop({payload});"
+                f"  if (window.__handleNativeFileDrop) window.__handleNativeFileDrop({payload});"
                 "}, 0);"
             )
         except Exception as e:
@@ -1492,10 +1490,8 @@ class API:
             logger.warning(f"处理原生拖放事件失败: {e}")
 
     @log_api_call
-    def bind_backup_drop_zone(self, selector: str = 'backup-drop-zone'):
-        """
-        由前端在 BackupList 挂载后显式调用，确保 pywebview 绑定到真实存在的拖放区域。
-        """
+    def bind_global_file_drop_zone(self, selector: str = 'app-shell'):
+        """由前端在全局拖放区域挂载后调用，绑定到当前真实存在的 DOM 节点。"""
         normalized_selector = self._normalize_native_drop_selector(selector)
         if self.is_browser_runtime():
             return ApiResponse.success({"selector": normalized_selector, "native": False})

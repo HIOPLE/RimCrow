@@ -384,7 +384,7 @@
             <template v-if="!isSoftwareBackup">{{ t('dialog.package_transfer.auto_backup_hint', '导入前会自动备份软件数据到 data/backups/all-data-backup.rimcrowdata.zip，每次覆盖上一份备份。') }}</template>
           </template>
           <template v-else>
-            {{ t('dialog.package_transfer.footer.mod_export', '如果同一个模组有多个来源，会优先带上你当前正在使用的版本，重复副本会自动跳过。') }}
+            {{ t('dialog.package_transfer.footer.mod_export', '如果同一个模组有多个来源，会优先带上你当前正在使用的版本，重复副本会自动跳过。导入位置：设置 → 数据管理 → 导入模组包。') }}
           </template>
         </div>
         <div class="flex items-center gap-2">

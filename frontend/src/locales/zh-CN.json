@@ -2475,7 +2475,7 @@
       "folder_name_type": "包内Mod文件夹命名",
       "folder_name_type_desc": "只影响导出包里的文件夹名称，不会改动原始Mod目录。遇到不适合作为文件名的字符会自动替换，重名会自动追加序号。",
       "footer": {
-        "mod_export": "如果同一个模组有多个来源，会优先带上你当前正在使用的版本，重复副本会自动跳过。",
+        "mod_export": "如果同一个模组有多个来源，会优先带上你当前正在使用的版本，重复副本会自动跳过。导入位置：设置 → 数据管理 → 导入模组包。",
         "mod_import": "导入到当前环境目录或管理器目录时会自动刷新当前模组列表。缺少本地文件的模组会跳过并提醒你。"
       },
       "format": "格式",
@@ -2609,7 +2609,7 @@
       "export_name": "导出名称",
       "export_name_placeholder": "例如：RimWorld 必备模组推荐",
       "exporting": "导出中...",
-      "footer_tip": "Markdown 会在导出目录内创建 <span class=\"font-bold text-accent-special\">img</span> 文件夹；纯图片会按导出名称新建文件夹，每个模组一张图。",
+      "footer_tip": "Markdown 会在导出目录内创建 <span class=\"font-bold text-accent-special\">img</span> 文件夹；纯图片会按导出名称新建文件夹，每个模组一张图。这是分享用的推荐清单，不支持导回软件数据。",
       "format": {
         "clipboard": "复制纯文本",
         "image": "纯图片"
@@ -4579,16 +4579,12 @@
     },
     "backup_list": {
       "backup_no_exportable_order": "该备份没有可导出的包名序列",
-      "drop_busy": "上一个拖入文件仍在处理中，请稍候",
       "empty_share_code": "后端没有返回有效的分享码",
       "exported_modlist": "备份已导出为 ModList",
       "exported_rml": "备份已导出为 RML",
       "name_sanitized": "文件名中的特殊字符已替换为下划线",
-      "native_drop_no_path": "原生拖放未返回有效文件路径",
-      "no_drop_file": "未检测到可导入文件",
       "no_exportable_order": "该条目没有可导出的包名序列",
       "no_share_code_order": "该备份没有可生成分享码的包名序列",
-      "only_one_file": "一次只能导入一个文件，已自动使用第一个文件",
       "rename_empty": "请输入新的备份名称"
     },
     "command": {
@@ -4629,6 +4625,12 @@
       "deploy_done": "{repo} 部署完成",
       "deploy_failed": "{repo} 部署失败",
       "install_source_submitted": "已提交 {count} 个 Git 来源订阅，正在开始下载。"
+    },
+    "global_drop": {
+      "data_bundle_browser": "浏览器模式无法直接读取拖入的软件数据包，请到“设置 → 数据管理 → 导入数据包”选择文件。",
+      "first_file_only": "一次只能导入一个文件，已使用第一个文件。",
+      "no_file": "未检测到可导入文件",
+      "unsupported_file": "无法识别该文件。支持排序文件和软件数据包。"
     },
     "group": {
       "add_mods_failed": "添加模组到分组失败，正在还原列表状态。请稍后重试。",
@@ -4945,15 +4947,15 @@
     "backup_list": {
       "export_modsconfig": {
         "loading": "正在导出 ModsConfig",
-        "ready": "导出为 ModsConfig.xml（仅含包名）"
+        "ready": "导出为 ModsConfig.xml（仅含包名）。导入请用“导入加载序列”或拖入主窗口。"
       },
       "export_rml": {
         "loading": "正在导出 RML",
-        "ready": "导出为 RML 游戏原生格式（含包名和工坊ID）"
+        "ready": "导出为 RML 游戏原生格式（含包名和工坊ID）。导入请用“导入加载序列”或拖入主窗口。"
       },
       "export_share_code": {
         "loading": "正在生成分享码",
-        "ready": "生成当前启用序列的分享码并复制到剪贴板"
+        "ready": "生成当前启用序列的分享码并复制到剪贴板；在“导入分享码”中粘贴导入。"
       },
       "import_file": {
         "loading": "正在导入加载序列",
@@ -5061,10 +5063,10 @@
       "debug_page": "测试页面",
       "file_search": "文件内容搜索",
       "load_order": {
-        "export_modlist": "导出为 ModList.xml（含包名和工坊ID）",
-        "export_modsconfig": "导出为 ModsConfig.xml（仅含包名）",
-        "export_rml": "导出为 RML（游戏原生导出格式）",
-        "export_share_code": "生成 RC- 分享码并复制到剪贴板",
+        "export_modlist": "导出为 ModList.xml（含包名和工坊ID）。导入请用“导入加载序列”或拖入主窗口。",
+        "export_modsconfig": "导出为 ModsConfig.xml（仅含包名）。导入请用“导入加载序列”或拖入主窗口。",
+        "export_rml": "导出为 RML（游戏原生格式）。导入请用“导入加载序列”或拖入主窗口。",
+        "export_share_code": "生成 RC- 分享码并复制到剪贴板；在“导入分享码”中粘贴导入。",
         "exporting_modlist": "正在导出 ModList",
         "exporting_modsconfig": "正在导出 ModsConfig",
         "exporting_rml": "正在导出 RML",
@@ -5459,11 +5461,6 @@
       }
     },
     "backup_list": {
-      "drop": {
-        "description": "松手后将自动尝试导入到对比视图",
-        "formats": "支持 `xml` / `rws` / `rml` / `json` / `txt` / `list`",
-        "title": "拖入加载序列文件"
-      },
       "empty": "暂无备份记录",
       "profile": {
         "description": "切换其它环境备份",
@@ -5563,6 +5560,11 @@
         "empty": "选择左侧文件或命中项后，这里显示只读文件内容。",
         "loading": "正在读取文件..."
       }
+    },
+    "global_drop": {
+      "description": "松手后会自动识别排序文件或软件数据包。",
+      "formats": "排序文件：xml / rws / rml / json / txt / list；软件数据包：rimcrowdata.zip",
+      "title": "拖入文件"
     },
     "group_list": {
       "action": {
@@ -6118,6 +6120,11 @@
         "title": "人工智能",
         "view_raw_response": "查看原始返回内容"
       },
+      "data": {
+        "help": "使用说明：先导出软件数据包保存到安全位置；需要恢复时，在本页选择数据包并按提示导入。也可以把排序文件或软件数据包直接拖到主窗口，软件会自动识别类型。",
+        "import_data_bundle_title": "导入软件数据包",
+        "title": "数据管理"
+      },
       "data_export": {
         "description": "勾选要打包的数据；如果选择环境数据，会打包对应环境的完整目录。",
         "excluded_data": "路径绑定、敏感信息、当前激活环境 ID",
@@ -6125,6 +6132,7 @@
         "export_selected": "导出当前选择",
         "import_conflicts": "环境导入冲突",
         "import_conflicts_notice": "会在导入面板统一处理新建/覆盖。",
+        "import_location": "导入位置：设置 → 数据管理 → 导入软件数据包。",
         "no_user_data_dir": "未检测到可打包的用户数据目录",
         "pack_full_profile_dir": "将打包整个环境目录",
         "profile_data": "环境数据",

@@ -2274,7 +2274,7 @@
       "description": "검토 작업: {taskCount} 그룹, 보류 중인 항목: {itemCount}.",
       "empty": "검토 대기 중인 일괄 결과가 없습니다.",
       "failed_count": "실패: {count}",
-      "footer_tip": "적용될 때까지 결과는 여기에 유지되므로 나중에 돌아와서 계속 검토할 수 있습니다.",
+      "footer_tip": "Markdown 내보내기는 내보내기 폴더에 <span class=\"font-bold text-accent-special\">img</span> 폴더를 만듭니다. 이미지 전용 내보내기는 내보내기 이름의 폴더를 만들고 모드마다 이미지 하나를 저장합니다. 공유용 추천 목록이며 소프트웨어 데이터로 가져올 수 없습니다.",
       "generation_failed_badge": "생성에 실패했습니다. 수동으로 채우거나 다시 시도하세요.",
       "input_count": "입력: {count}",
       "later": "나중에 처리",
@@ -2475,7 +2475,7 @@
       "folder_name_type": "패키지 내부의 Mod 폴더 이름",
       "folder_name_type_desc": "내보낸 패키지 내의 폴더 이름에만 영향을 미칩니다. 원래 모드 디렉토리는 변경되지 않습니다. 잘못된 파일 이름 문자는 대체되고 중복 항목에는 접미사가 붙습니다.",
       "footer": {
-        "mod_export": "동일한 모드에 여러 소스가 있는 경우 현재 사용 중인 버전이 선호되며 중복 복사본은 건너뜁니다.",
+        "mod_export": "모드에 여러 출처가 있으면 현재 사용 중인 버전을 우선 포함하고 중복은 건너뜁니다. 가져오기: 설정 → 데이터 관리 → 모드 패키지 가져오기.",
         "mod_import": "현재 환경이나 관리자 디렉터리로 가져오면 현재 모드 목록이 자동으로 새로 고쳐집니다. 로컬 파일이 누락된 모드는 건너뛰고 보고됩니다."
       },
       "format": "체재",
@@ -2609,7 +2609,7 @@
       "export_name": "내보내기 이름",
       "export_name_placeholder": "예: 필수 RimWorld 모드 권장 사항",
       "exporting": "내보내는 중...",
-      "footer_tip": "Markdown은 내보내기 폴더에 <span class=\"font-bold text-accent-special\">img</span> 폴더를 생성합니다. 이미지 전용 내보내기는 모드당 하나의 이미지로 내보내기 이름을 딴 폴더를 생성합니다.",
+      "footer_tip": "Markdown 내보내기는 내보내기 폴더에 img 폴더를 만듭니다. 이미지 전용 내보내기는 내보내기 이름의 폴더를 만들고 모드마다 이미지 하나를 저장합니다. 공유용 추천 목록이며 소프트웨어 데이터로 가져올 수 없습니다.",
       "format": {
         "clipboard": "일반 텍스트 복사",
         "image": "이미지만"
@@ -4579,16 +4579,12 @@
     },
     "backup_list": {
       "backup_no_exportable_order": "이 백업에는 내보낼 패키지 ID 시퀀스가 ​​없습니다.",
-      "drop_busy": "이전에 삭제된 파일이 아직 처리 중입니다. 기다리세요.",
       "empty_share_code": "유효한 공유 코드가 반환되지 않았습니다.",
       "exported_modlist": "ModList로 내보낸 백업",
       "exported_rml": "RML로 내보낸 백업",
       "name_sanitized": "파일 이름의 특수 문자가 밑줄로 대체되었습니다.",
-      "native_drop_no_path": "기본 드래그 앤 드롭이 유효한 파일 경로를 반환하지 않았습니다.",
-      "no_drop_file": "가져올 수 있는 파일이 감지되지 않았습니다.",
       "no_exportable_order": "이 항목에는 내보낼 패키지 ID 시퀀스가 ​​없습니다.",
       "no_share_code_order": "이 백업에는 공유 코드에 대한 패키지 ID 시퀀스가 ​​없습니다.",
-      "only_one_file": "한 번에 하나의 파일만 가져올 수 있습니다. 첫 번째 파일이 사용되었습니다.",
       "rename_empty": "새 백업 이름을 입력하세요."
     },
     "command": {
@@ -4629,6 +4625,12 @@
       "deploy_done": "{repo} 배포 완료",
       "deploy_failed": "{repo} 배포 실패",
       "install_source_submitted": "{count}개의 Git 소스 구독을 제출했습니다. 다운로드를 시작합니다."
+    },
+    "global_drop": {
+      "data_bundle_browser": "브라우저 모드에서는 끌어 놓은 소프트웨어 데이터 패키지를 바로 읽을 수 없습니다. 설정 → 데이터 관리 → 소프트웨어 데이터 패키지 가져오기에서 선택하세요.",
+      "first_file_only": "한 번에 파일 하나만 가져올 수 있습니다. 첫 번째 파일을 선택했습니다.",
+      "no_file": "가져올 수 있는 파일을 찾지 못했습니다.",
+      "unsupported_file": "인식할 수 없는 파일 형식입니다. 정렬 파일과 소프트웨어 데이터 패키지를 지원합니다."
     },
     "group": {
       "add_mods_failed": "Mod를 그룹에 추가하지 못했습니다. 목록 상태를 되돌리는 중입니다. 잠시 후 다시 시도하세요.",
@@ -4945,15 +4947,15 @@
     "backup_list": {
       "export_modsconfig": {
         "loading": "ModsConfig 내보내기",
-        "ready": "ModsConfig.xml로 내보내기(패키지 ID만)"
+        "ready": "패키지 ID만 포함한 ModsConfig.xml로 내보냅니다. ‘정렬 가져오기’를 사용하거나 파일을 메인 창에 끌어 놓으세요."
       },
       "export_rml": {
         "loading": "RML 내보내기",
-        "ready": "기본 RimWorld 형식(패키지 ID 및 Workshop ID)인 RML로 내보내기"
+        "ready": "패키지 및 Workshop ID를 포함한 게임 기본 RML 형식으로 내보냅니다. ‘정렬 가져오기’를 사용하거나 파일을 메인 창에 끌어 놓으세요."
       },
       "export_share_code": {
         "loading": "공유 코드 생성 중",
-        "ready": "현재 활성 목록에 대한 공유 코드를 생성하고 클립보드에 복사합니다."
+        "ready": "활성 정렬의 공유 코드를 만들고 복사합니다. ‘공유 코드 가져오기’에 붙여 넣으세요."
       },
       "import_file": {
         "loading": "로드 순서 가져오기",
@@ -5061,10 +5063,10 @@
       "debug_page": "테스트 페이지",
       "file_search": "파일 콘텐츠 검색",
       "load_order": {
-        "export_modlist": "ModList.xml로 내보내기(패키지 ID 및 Workshop ID 포함)",
-        "export_modsconfig": "ModsConfig.xml로 내보내기(패키지 ID만)",
-        "export_rml": "RML(게임 기본 내보내기 형식)로 내보내기",
-        "export_share_code": "RC 공유 코드를 생성하고 클립보드에 복사하세요.",
+        "export_modlist": "패키지 및 Workshop ID를 포함한 ModList.xml로 내보냅니다. ‘정렬 가져오기’를 사용하거나 파일을 메인 창에 끌어 놓으세요.",
+        "export_modsconfig": "패키지 ID만 포함한 ModsConfig.xml로 내보냅니다. ‘정렬 가져오기’를 사용하거나 파일을 메인 창에 끌어 놓으세요.",
+        "export_rml": "게임 기본 RML 형식으로 내보냅니다. ‘정렬 가져오기’를 사용하거나 파일을 메인 창에 끌어 놓으세요.",
+        "export_share_code": "RC 공유 코드를 만들고 복사합니다. ‘공유 코드 가져오기’에 붙여 넣으세요.",
         "exporting_modlist": "ModList 내보내기",
         "exporting_modsconfig": "ModsConfig 내보내기",
         "exporting_rml": "RML 내보내기",
@@ -5459,11 +5461,6 @@
       }
     },
     "backup_list": {
-      "drop": {
-        "description": "비교 보기로 가져오려면 놓습니다.",
-        "formats": "`xml` / `rws` / `rml` / `json` / `txt` / `list` 지원",
-        "title": "로드 순서 파일 삭제"
-      },
       "empty": "백업 기록 없음",
       "profile": {
         "description": "다른 프로필의 백업으로 전환",
@@ -5563,6 +5560,11 @@
         "empty": "여기에서 읽기 전용 파일 내용을 미리 보려면 왼쪽에서 파일이나 일치 항목을 선택하세요.",
         "loading": "파일을 읽는 중..."
       }
+    },
+    "global_drop": {
+      "description": "파일을 놓으면 형식을 자동 감지합니다.",
+      "formats": "정렬 파일: xml / rws / rml / json / txt / list; 소프트웨어 데이터 패키지: rimcrowdata.zip",
+      "title": "파일을 여기에 놓으세요"
     },
     "group_list": {
       "action": {
@@ -6118,6 +6120,11 @@
         "title": "인공지능",
         "view_raw_response": "원시 응답 보기"
       },
+      "data": {
+        "help": "사용 방법: 소프트웨어 데이터 패키지를 내보내 안전한 위치에 저장하세요. 복원하려면 이 페이지에서 패키지를 선택하고 안내에 따라 가져오세요. 정렬 파일이나 소프트웨어 데이터 패키지를 메인 창으로 끌어다 놓아도 RimCrow가 유형을 자동으로 인식합니다.",
+        "import_data_bundle_title": "소프트웨어 데이터 패키지 가져오기",
+        "title": "데이터 관리"
+      },
       "data_export": {
         "description": "패키징할 데이터를 선택합니다. 프로필 데이터를 선택하면 선택한 각 프로필의 전체 디렉터리가 포함됩니다.",
         "excluded_data": "경로 바인딩, 민감한 정보, 현재 활성 프로필 ID",
@@ -6125,6 +6132,7 @@
         "export_selected": "선택한 내보내기",
         "import_conflicts": "프로필 가져오기 충돌",
         "import_conflicts_notice": "생성/덮어쓰기 옵션을 사용하여 가져오기 패널에서 처리됩니다.",
+        "import_location": "가져오기: 설정 → 데이터 관리 → 소프트웨어 데이터 패키지 가져오기.",
         "no_user_data_dir": "패키지 가능한 사용자 데이터 디렉터리를 찾을 수 없습니다.",
         "pack_full_profile_dir": "전체 프로필 디렉터리가 패키지됩니다.",
         "profile_data": "프로필 데이터",

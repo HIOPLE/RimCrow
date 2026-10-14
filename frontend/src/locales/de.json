@@ -2274,7 +2274,7 @@
       "description": "Überprüfungsaufgaben: {taskCount}-Gruppen, ausstehende Einträge: {itemCount}.",
       "empty": "Es liegen keine Batch-Ergebnisse vor, die auf eine Überprüfung warten",
       "failed_count": "Fehlgeschlagen: {count}",
-      "footer_tip": "Bis zur Anwendung bleiben die Ergebnisse hier, sodass Sie später zurückkehren und mit der Überprüfung fortfahren können.",
+      "footer_tip": "Markdown-Exporte erstellen im Exportordner einen Ordner <span class=\"font-bold text-accent-special\">img</span>. Reine Bildexporte erstellen einen Ordner mit dem Exportnamen und einem Bild pro Mod. Diese Empfehlungsliste kann geteilt, aber nicht als Softwaredaten importiert werden.",
       "generation_failed_badge": "Die Generierung ist fehlgeschlagen. Manuell füllen oder erneut versuchen",
       "input_count": "Eingabe: {count}",
       "later": "Behandeln Sie es später",
@@ -2475,7 +2475,7 @@
       "folder_name_type": "Mod-Ordnernamen im Paket",
       "folder_name_type_desc": "Betrifft nur Ordnernamen innerhalb des exportierten Pakets. Ursprüngliche Mod-Verzeichnisse werden nicht geändert. Ungültige Zeichen im Dateinamen werden ersetzt und Duplikate erhalten ein Suffix.",
       "footer": {
-        "mod_export": "Wenn derselbe Mod mehrere Quellen hat, wird die aktuell verwendete Version bevorzugt und doppelte Kopien werden übersprungen.",
+        "mod_export": "Wenn eine Mod mehrere Quellen hat, wird zuerst die aktuell verwendete Version übernommen; Duplikate werden übersprungen. Import: Einstellungen → Datenverwaltung → Mod-Paket importieren.",
         "mod_import": "Durch den Import in die aktuelle Umgebung oder das Manager-Verzeichnis wird die aktuelle Mod-Liste automatisch aktualisiert. Mods, denen lokale Dateien fehlen, werden übersprungen und gemeldet."
       },
       "format": "Format",
@@ -2609,7 +2609,7 @@
       "export_name": "Exportname",
       "export_name_placeholder": "Beispiel: Grundlegende RimWorld-Mod-Empfehlungen",
       "exporting": "Exportieren...",
-      "footer_tip": "Markdown erstellt einen <span class=\"font-bold text-accent-special\">img</span>-Ordner im Exportordner; Beim Nur-Bild-Export wird ein nach dem Export benannter Ordner mit einem Bild pro Mod erstellt.",
+      "footer_tip": "Markdown-Exporte erstellen im Exportordner einen img-Ordner. Reine Bildexporte erstellen einen Ordner mit dem Exportnamen und einem Bild pro Mod. Diese Empfehlungsliste kann geteilt, aber nicht als Softwaredaten importiert werden.",
       "format": {
         "clipboard": "Klartext kopieren",
         "image": "Nur Bilder"
@@ -4579,16 +4579,12 @@
     },
     "backup_list": {
       "backup_no_exportable_order": "Dieses Backup hat keine zu exportierende Paket-ID-Sequenz",
-      "drop_busy": "Die zuvor abgelegte Datei wird noch verarbeitet. Bitte warten.",
       "empty_share_code": "Es wurde kein gültiger Freigabecode zurückgegeben",
       "exported_modlist": "Backup als ModList exportiert",
       "exported_rml": "Backup als RML exportiert",
       "name_sanitized": "Sonderzeichen im Dateinamen wurden durch Unterstriche ersetzt",
-      "native_drop_no_path": "Natives Drag-and-Drop hat keinen gültigen Dateipfad zurückgegeben",
-      "no_drop_file": "Keine importierbare Datei erkannt",
       "no_exportable_order": "Dieser Eintrag hat keine zu exportierende Paket-ID-Sequenz",
       "no_share_code_order": "Dieses Backup hat keine Paket-ID-Sequenz für einen Freigabecode",
-      "only_one_file": "Es kann jeweils nur eine Datei importiert werden. Die erste Datei wurde verwendet.",
       "rename_empty": "Geben Sie einen neuen Backup-Namen ein"
     },
     "command": {
@@ -4629,6 +4625,12 @@
       "deploy_done": "{repo} bereitgestellt",
       "deploy_failed": "{repo} konnte nicht bereitgestellt werden",
       "install_source_submitted": "{count} Git-Quellabonnements wurden übermittelt, Download startet."
+    },
+    "global_drop": {
+      "data_bundle_browser": "Im Browsermodus können abgelegte Softwaredatenpakete nicht direkt gelesen werden. Wähle die Datei unter Einstellungen → Datenverwaltung → Softwaredatenpaket importieren aus.",
+      "first_file_only": "Es kann jeweils nur eine Datei importiert werden. Die erste Datei wurde ausgewählt.",
+      "no_file": "Keine importierbare Datei erkannt.",
+      "unsupported_file": "Dateityp nicht erkannt. Unterstützt werden Loadorder-Dateien und Softwaredatenpakete."
     },
     "group": {
       "add_mods_failed": "Mods konnten nicht zur Gruppe hinzugefügt werden. Listenstatus wird wiederhergestellt. Versuchen Sie es später erneut.",
@@ -4945,15 +4947,15 @@
     "backup_list": {
       "export_modsconfig": {
         "loading": "ModsConfig exportieren",
-        "ready": "Export als ModsConfig.xml (nur Paket-IDs)"
+        "ready": "Als ModsConfig.xml nur mit Paket-IDs exportieren. Zum Import „Loadorder importieren“ verwenden oder die Datei in das Hauptfenster ziehen."
       },
       "export_rml": {
         "loading": "RML exportieren",
-        "ready": "Export als RML, das native RimWorld-Format (Paket-IDs und Workshop IDs)"
+        "ready": "Als natives RML-Format des Spiels exportieren, einschließlich Paket- und Workshop-IDs. Zum Import „Loadorder importieren“ verwenden oder die Datei in das Hauptfenster ziehen."
       },
       "export_share_code": {
         "loading": "Freigabecode generieren",
-        "ready": "Generieren Sie einen Freigabecode für die aktuell aktive Liste und kopieren Sie ihn in die Zwischenablage"
+        "ready": "Freigabecode für die aktivierte Loadorder erstellen und kopieren. Zum Import unter „Freigabecode importieren“ einfügen."
       },
       "import_file": {
         "loading": "Ladereihenfolge wird importiert",
@@ -5061,10 +5063,10 @@
       "debug_page": "Testseite",
       "file_search": "Suche nach Dateiinhalten",
       "load_order": {
-        "export_modlist": "Export als ModList.xml (einschließlich Paket-IDs und Workshop IDs)",
-        "export_modsconfig": "Export als ModsConfig.xml (nur Paket-IDs)",
-        "export_rml": "Export als RML (game-native export format)",
-        "export_share_code": "Generieren Sie einen RC-Share-Code und kopieren Sie ihn in die Zwischenablage",
+        "export_modlist": "Als ModList.xml mit Paket- und Workshop-IDs exportieren. Zum Import „Loadorder importieren“ verwenden oder die Datei in das Hauptfenster ziehen.",
+        "export_modsconfig": "Als ModsConfig.xml nur mit Paket-IDs exportieren. Zum Import „Loadorder importieren“ verwenden oder die Datei in das Hauptfenster ziehen.",
+        "export_rml": "Als natives RML-Format des Spiels exportieren. Zum Import „Loadorder importieren“ verwenden oder die Datei in das Hauptfenster ziehen.",
+        "export_share_code": "RC-Freigabecode erstellen und kopieren. Zum Import unter „Freigabecode importieren“ einfügen.",
         "exporting_modlist": "ModList exportieren",
         "exporting_modsconfig": "ModsConfig exportieren",
         "exporting_rml": "RML exportieren",
@@ -5459,11 +5461,6 @@
       }
     },
     "backup_list": {
-      "drop": {
-        "description": "Lassen Sie los, um es in die Vergleichsansicht zu importieren",
-        "formats": "Unterstützt „xml“ / „rws“ / „rml“ / „json“ / „txt“ / „list“.",
-        "title": "Löschen Sie eine Ladereihenfolgedatei"
-      },
       "empty": "Keine Sicherungsaufzeichnungen",
       "profile": {
         "description": "Wechseln Sie zu Backups von einem anderen Profil",
@@ -5563,6 +5560,11 @@
         "empty": "Wählen Sie links eine Datei oder einen Treffer aus, um hier eine Vorschau der schreibgeschützten Dateiinhalte anzuzeigen.",
         "loading": "Datei wird gelesen..."
       }
+    },
+    "global_drop": {
+      "description": "Der Dateityp wird beim Ablegen automatisch erkannt.",
+      "formats": "Loadorder-Dateien: xml / rws / rml / json / txt / list; Softwaredatenpakete: rimcrowdata.zip",
+      "title": "Dateien hier ablegen"
     },
     "group_list": {
       "action": {
@@ -6118,6 +6120,11 @@
         "title": "Künstliche Intelligenz",
         "view_raw_response": "Rohantwort ansehen"
       },
+      "data": {
+        "help": "Anleitung: Exportiere ein Software-Datenpaket und speichere es an einem sicheren Ort. Zum Wiederherstellen wählst du das Paket auf dieser Seite aus und folgst den Hinweisen. Du kannst auch eine Ladereihenfolge-Datei oder ein Software-Datenpaket auf das Hauptfenster ziehen; RimCrow erkennt den Dateityp automatisch.",
+        "import_data_bundle_title": "Softwaredatenpaket importieren",
+        "title": "Datenverwaltung"
+      },
       "data_export": {
         "description": "Wählen Sie die zu verpackenden Daten aus. Wenn Profildaten ausgewählt werden, ist das vollständige Verzeichnis jedes ausgewählten Profils enthalten.",
         "excluded_data": "Pfadbindungen, vertrauliche Informationen und aktuell aktive Profil-ID",
@@ -6125,6 +6132,7 @@
         "export_selected": "Exportieren ausgewählt",
         "import_conflicts": "Konflikte beim Profilimport",
         "import_conflicts_notice": "werden im Importbereich mit Optionen zum Erstellen/Überschreiben behandelt.",
+        "import_location": "Import: Einstellungen → Datenverwaltung → Softwaredatenpaket importieren.",
         "no_user_data_dir": "Es wurde kein verpackbares Benutzerdatenverzeichnis gefunden",
         "pack_full_profile_dir": "Das gesamte Profilverzeichnis wird gepackt",
         "profile_data": "Profildaten",

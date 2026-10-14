@@ -2274,7 +2274,7 @@
       "description": "待檢閱任務 {taskCount} 組，待檢閱條目 {itemCount} 項。",
       "empty": "目前沒有待檢閱的批量結果",
       "failed_count": "失敗: {count}",
-      "footer_tip": "未確認應用前，結果會一直保留在這裡，可隨時回來繼續檢閱。",
+      "footer_tip": "Markdown 會在匯出目錄建立 <span class=\"font-bold text-accent-special\">img</span> 資料夾；純圖片匯出會依匯出名稱建立資料夾，每個模組一張圖片。這是分享用的推薦清單，不能匯入為軟體資料。",
       "generation_failed_badge": "生成失敗，請手填或重試",
       "input_count": "輸入: {count}",
       "later": "稍後處理",
@@ -2475,7 +2475,7 @@
       "folder_name_type": "包內Mod資料夾命名",
       "folder_name_type_desc": "隻影響導出包裡的資料夾名稱，不會改動原始Mod目錄。遇到不適合作為檔案名的字符會自動替換，重名會自動追加序號。",
       "footer": {
-        "mod_export": "如果同一個模組有多個來源，會優先帶上你目前正在使用的版本，重複副本會自動跳過。",
+        "mod_export": "若同一模組有多個來源，會優先匯出目前使用的版本，並略過重複項目。匯入位置：設定 → 資料管理 → 匯入模組包。",
         "mod_import": "導入到目前環境目錄或管理器目錄時會自動重新整理目前模組列表。缺少本地檔案的模組會跳過並提醒你。"
       },
       "format": "格式",
@@ -2609,7 +2609,7 @@
       "export_name": "導出名稱",
       "export_name_placeholder": "例如：RimWorld 必備模組推薦",
       "exporting": "導出中...",
-      "footer_tip": "Markdown 會在導出目錄內創建 <span class=\"font-bold text-accent-special\">img</span> 資料夾；純圖片會按導出名稱新建資料夾，每個模組一張圖。",
+      "footer_tip": "Markdown 會在匯出目錄建立 img 資料夾；純圖片匯出會依匯出名稱建立資料夾，每個模組一張圖片。這是分享用的推薦清單，不能匯入為軟體資料。",
       "format": {
         "clipboard": "複製純文字",
         "image": "純圖片"
@@ -4579,16 +4579,12 @@
     },
     "backup_list": {
       "backup_no_exportable_order": "該備份沒有可導出的包名序列",
-      "drop_busy": "上一個拖入檔案仍在處理中，請稍候",
       "empty_share_code": "後端沒有返回有效的分享碼",
       "exported_modlist": "備份已導出為 ModList",
       "exported_rml": "備份已導出為 RML",
       "name_sanitized": "檔案名中的特殊字符已替換為下劃線",
-      "native_drop_no_path": "原生拖放未返回有效檔案路徑",
-      "no_drop_file": "未檢測到可導入檔案",
       "no_exportable_order": "該條目沒有可導出的包名序列",
       "no_share_code_order": "該備份沒有可生成分享碼的包名序列",
-      "only_one_file": "一次只能導入一個檔案，已自動使用第一個檔案",
       "rename_empty": "請輸入新的備份名稱"
     },
     "command": {
@@ -4629,6 +4625,12 @@
       "deploy_done": "{repo} 部署完成",
       "deploy_failed": "{repo} 部署失敗",
       "install_source_submitted": "已提交 {count} 個 Git 來源訂閱，即將開始下載。"
+    },
+    "global_drop": {
+      "data_bundle_browser": "瀏覽器模式無法直接讀取拖入的軟體資料包，請前往「設定 → 資料管理 → 匯入軟體資料包」選取檔案。",
+      "first_file_only": "一次只能匯入一個檔案，已使用第一個檔案。",
+      "no_file": "未偵測到可匯入的檔案。",
+      "unsupported_file": "無法識別此檔案。支援排序檔案和軟體資料包。"
     },
     "group": {
       "add_mods_failed": "新增模組到分組失敗，正在還原清單狀態。請稍後重試。",
@@ -4945,15 +4947,15 @@
     "backup_list": {
       "export_modsconfig": {
         "loading": "正在導出 ModsConfig",
-        "ready": "導出為 ModsConfig.xml（僅含包名）"
+        "ready": "匯出為 ModsConfig.xml（僅含套件名稱）。請使用「匯入載入順序」或將檔案拖入主視窗匯入。"
       },
       "export_rml": {
         "loading": "正在導出 RML",
-        "ready": "導出為 RML 遊戲原生格式（含包名和工坊ID）"
+        "ready": "匯出為遊戲原生 RML 格式（含套件名稱和工坊 ID）。請使用「匯入載入順序」或將檔案拖入主視窗匯入。"
       },
       "export_share_code": {
         "loading": "正在生成分享碼",
-        "ready": "生成目前啟用序列的分享碼並複製到剪貼板"
+        "ready": "產生目前啟用順序的分享碼並複製；請在「匯入分享碼」中貼上。"
       },
       "import_file": {
         "loading": "正在導入載入序列",
@@ -5061,10 +5063,10 @@
       "debug_page": "測試頁面",
       "file_search": "檔案內容搜尋",
       "load_order": {
-        "export_modlist": "導出為 ModList.xml（含包名和工坊ID）",
-        "export_modsconfig": "導出為 ModsConfig.xml（僅含包名）",
-        "export_rml": "導出為 RML（遊戲原生導出格式）",
-        "export_share_code": "生成 RC- 分享碼並複製到剪貼板",
+        "export_modlist": "匯出為 ModList.xml（含套件名稱和工坊 ID）。請使用「匯入載入順序」或將檔案拖入主視窗匯入。",
+        "export_modsconfig": "匯出為 ModsConfig.xml（僅含套件名稱）。請使用「匯入載入順序」或將檔案拖入主視窗匯入。",
+        "export_rml": "匯出為遊戲原生 RML 格式。請使用「匯入載入順序」或將檔案拖入主視窗匯入。",
+        "export_share_code": "產生 RC 分享碼並複製；請在「匯入分享碼」中貼上。",
         "exporting_modlist": "正在導出 ModList",
         "exporting_modsconfig": "正在導出 ModsConfig",
         "exporting_rml": "正在導出 RML",
@@ -5459,11 +5461,6 @@
       }
     },
     "backup_list": {
-      "drop": {
-        "description": "鬆手後將自動嘗試導入到對比視圖",
-        "formats": "支持 `xml` / `rws` / `rml` / `json` / `txt` / `list`",
-        "title": "拖入載入序列檔案"
-      },
       "empty": "暫無備份記錄",
       "profile": {
         "description": "切換其它環境備份",
@@ -5563,6 +5560,11 @@
         "empty": "選擇左側檔案或命中項後，這裡顯示只讀檔案內容。",
         "loading": "正在讀取檔案..."
       }
+    },
+    "global_drop": {
+      "description": "放開滑鼠後會自動識別檔案類型。",
+      "formats": "排序檔案：xml / rws / rml / json / txt / list；軟體資料包：rimcrowdata.zip",
+      "title": "將檔案拖曳到這裡"
     },
     "group_list": {
       "action": {
@@ -6118,6 +6120,11 @@
         "title": "人工智能",
         "view_raw_response": "查看原始返回內容"
       },
+      "data": {
+        "help": "使用說明：先匯出軟體資料包並儲存到安全的位置；需要還原時，在本頁選擇資料包並依照提示匯入。也可以將排序檔案或軟體資料包直接拖曳到主視窗，RimCrow 會自動辨識類型。",
+        "import_data_bundle_title": "匯入軟體資料包",
+        "title": "資料管理"
+      },
       "data_export": {
         "description": "勾選要打包的資料；如果選擇環境資料，會打包對應環境的完整目錄。",
         "excluded_data": "路徑綁定、敏感資訊、目前激活環境 ID",
@@ -6125,6 +6132,7 @@
         "export_selected": "導出目前選擇",
         "import_conflicts": "環境導入衝突",
         "import_conflicts_notice": "會在導入面板統一處理新建/覆蓋。",
+        "import_location": "匯入位置：設定 → 資料管理 → 匯入軟體資料包。",
         "no_user_data_dir": "未檢測到可打包的使用者資料目錄",
         "pack_full_profile_dir": "將打包整個環境目錄",
         "profile_data": "環境資料",

@@ -2274,7 +2274,7 @@
       "description": "Review tasks: {taskCount} groups, pending entries: {itemCount}.",
       "empty": "There are no batch results waiting for review",
       "failed_count": "Failed: {count}",
-      "footer_tip": "Until applied, results stay here so you can return and continue reviewing later.",
+      "footer_tip": "Markdown exports create an <span class=\"font-bold text-accent-special\">img</span> folder in the export directory. Image-only exports create a folder named after the export, with one image per mod. This shareable recommendation list cannot be imported as software data.",
       "generation_failed_badge": "Generation failed. Fill manually or retry",
       "input_count": "Input: {count}",
       "later": "Handle later",
@@ -2475,7 +2475,7 @@
       "folder_name_type": "Mod folder names inside package",
       "folder_name_type_desc": "Only affects folder names inside the exported package. Original mod directories are not changed. Invalid filename characters are replaced and duplicates get a suffix.",
       "footer": {
-        "mod_export": "If the same mod has multiple sources, the version currently in use is preferred and duplicate copies are skipped.",
+        "mod_export": "If a mod has multiple sources, the version currently in use is included first and duplicates are skipped. Import at Settings → Data Management → Import mod package.",
         "mod_import": "Importing into the current environment or manager directory refreshes the current mod list automatically. Mods missing local files are skipped and reported."
       },
       "format": "Format",
@@ -2609,7 +2609,7 @@
       "export_name": "Export name",
       "export_name_placeholder": "Example: Essential RimWorld mod recommendations",
       "exporting": "Exporting...",
-      "footer_tip": "Markdown creates an <span class=\"font-bold text-accent-special\">img</span> folder in the export folder; image-only export creates a folder named after the export, with one image per mod.",
+      "footer_tip": "Markdown exports create an img folder in the export directory. Image-only exports create a folder named after the export, with one image per mod. This shareable recommendation list cannot be imported as software data.",
       "format": {
         "clipboard": "Copy plain text",
         "image": "Images only"
@@ -4579,16 +4579,12 @@
     },
     "backup_list": {
       "backup_no_exportable_order": "This backup has no package ID sequence to export",
-      "drop_busy": "The previous dropped file is still being processed. Please wait.",
       "empty_share_code": "No valid share code returned",
       "exported_modlist": "Backup exported as ModList",
       "exported_rml": "Backup exported as RML",
       "name_sanitized": "Special characters in the file name were replaced with underscores",
-      "native_drop_no_path": "Native drag-and-drop did not return a valid file path",
-      "no_drop_file": "No importable file detected",
       "no_exportable_order": "This entry has no package ID sequence to export",
       "no_share_code_order": "This backup has no package ID sequence for a share code",
-      "only_one_file": "Only one file can be imported at a time. The first file was used.",
       "rename_empty": "Enter a new backup name"
     },
     "command": {
@@ -4629,6 +4625,12 @@
       "deploy_done": "{repo} deployed",
       "deploy_failed": "{repo} deployment failed",
       "install_source_submitted": "Submitted {count} Git source subscriptions. Starting downloads."
+    },
+    "global_drop": {
+      "data_bundle_browser": "Browser mode cannot read dropped software data packages directly. Choose the file at Settings → Data Management → Import software data package.",
+      "first_file_only": "Only one file can be imported at a time. The first file was selected.",
+      "no_file": "No importable file was detected.",
+      "unsupported_file": "Unrecognized file type. Supported: load-order files and software data packages."
     },
     "group": {
       "add_mods_failed": "Failed to add Mods to the group. Restoring the list. Try again later.",
@@ -4945,15 +4947,15 @@
     "backup_list": {
       "export_modsconfig": {
         "loading": "Exporting ModsConfig",
-        "ready": "Export as ModsConfig.xml (package IDs only)"
+        "ready": "Export as ModsConfig.xml with package IDs only. Import with Import Load Order or drop the file into the main window."
       },
       "export_rml": {
         "loading": "Exporting RML",
-        "ready": "Export as RML, the native RimWorld format (package IDs and Workshop IDs)"
+        "ready": "Export as native game RML, including package and Workshop IDs. Import with Import Load Order or drop the file into the main window."
       },
       "export_share_code": {
         "loading": "Generating share code",
-        "ready": "Generate a share code for the current active list and copy it to clipboard"
+        "ready": "Create a share code for the enabled load order and copy it. Paste it into Import Share Code to import."
       },
       "import_file": {
         "loading": "Importing load order",
@@ -5061,10 +5063,10 @@
       "debug_page": "Test page",
       "file_search": "File content search",
       "load_order": {
-        "export_modlist": "Export as ModList.xml (includes package IDs and Workshop IDs)",
-        "export_modsconfig": "Export as ModsConfig.xml (package IDs only)",
-        "export_rml": "Export as RML (game-native export format)",
-        "export_share_code": "Generate an RC- share code and copy it to the clipboard",
+        "export_modlist": "Export as ModList.xml, including package and Workshop IDs. Import with Import Load Order or drop the file into the main window.",
+        "export_modsconfig": "Export as ModsConfig.xml with package IDs only. Import with Import Load Order or drop the file into the main window.",
+        "export_rml": "Export as native game RML. Import with Import Load Order or drop the file into the main window.",
+        "export_share_code": "Create an RC share code and copy it. Paste it into Import Share Code to import.",
         "exporting_modlist": "Exporting ModList",
         "exporting_modsconfig": "Exporting ModsConfig",
         "exporting_rml": "Exporting RML",
@@ -5459,11 +5461,6 @@
       }
     },
     "backup_list": {
-      "drop": {
-        "description": "Release to import it into the comparison view",
-        "formats": "Supports `xml` / `rws` / `rml` / `json` / `txt` / `list`",
-        "title": "Drop a load order file"
-      },
       "empty": "No backup records",
       "profile": {
         "description": "Switch to backups from another profile",
@@ -5563,6 +5560,11 @@
         "empty": "Select a file or match on the left to preview read-only file contents here.",
         "loading": "Reading file..."
       }
+    },
+    "global_drop": {
+      "description": "File type is detected automatically when dropped.",
+      "formats": "Load-order files: xml / rws / rml / json / txt / list; software data packages: rimcrowdata.zip",
+      "title": "Drop files here"
     },
     "group_list": {
       "action": {
@@ -6118,6 +6120,11 @@
         "title": "Artificial intelligence",
         "view_raw_response": "View raw response"
       },
+      "data": {
+        "help": "How to use: Export a software data package and save it somewhere safe. To restore it, select the package on this page and follow the prompts. You can also drag a load order file or software data package onto the main window; RimCrow will recognize its type.",
+        "import_data_bundle_title": "Import software data package",
+        "title": "Data Management"
+      },
       "data_export": {
         "description": "Select the data to package. If profile data is selected, the full directory of each selected profile is included.",
         "excluded_data": "Path bindings, sensitive information, and current active profile ID",
@@ -6125,6 +6132,7 @@
         "export_selected": "Export selected",
         "import_conflicts": "Profile import conflicts",
         "import_conflicts_notice": "are handled in the import panel with create/overwrite options.",
+        "import_location": "Import at Settings → Data Management → Import software data package.",
         "no_user_data_dir": "No packageable user data directory was found",
         "pack_full_profile_dir": "The whole profile directory will be packaged",
         "profile_data": "Profile data",
