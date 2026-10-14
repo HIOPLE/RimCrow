@@ -713,7 +713,6 @@
       "steam_still_running": "Steam is still running. Waiting for it to exit."
     },
     "github": {
-      "branch_link_unresolved": "Cannot determine the branch in this link. Detect and select a branch, or enter its name.",
       "branch_required": "Target branch not found. Detect and select a valid branch, then try again.",
       "deploy_started": "Git subscription deployment task started",
       "invalid_url": "Invalid Git repository URL",
@@ -6935,9 +6934,6 @@
       },
       "github": {
         "action": {
-          "create_catalog_subscription": "Create catalog subscription",
-          "create_subscription": "Create subscription",
-          "parse_recommended_repo": "Parse recommended repository",
           "parse_repo": "Parse Git repository URL",
           "request_transfer": "Request data transfer"
         },
@@ -6946,35 +6942,31 @@
           "open_original": "Open original URL"
         },
         "active": {
-          "current_mode": "Current mode: {mode}",
-          "deploy_latest": "Fetch and deploy latest",
           "deploy_now": "Deploy now",
-          "deploy_tooltip": "Fetch and deploy current subscription",
-          "installed_version": "Deployed version: {version}",
           "local_audit_log": "Local audit log",
           "no_logs": "No audit records"
         },
         "branch": {
-          "confirm": "Switch {repo} to {branch} and redeploy? Files in the current local mod folder will be overwritten.",
           "detect": "Detect remote branches",
           "empty": "This repository has no available branches",
           "label": "Branch",
-          "missing": "Target branch or commit not found. Detect and select a valid branch.",
-          "switch": "Switch and deploy"
+          "switch": "Switch branch"
         },
         "catalog": {
-          "add_git_subscription": "Add as Git subscription",
-          "add_zip_subscription": "Add as Git subscription and deploy zip",
           "branch": "Branch: {branch}",
           "cache_badge": "Cached",
+          "category": "Category",
           "empty": "No matching recommended items",
           "filter_placeholder": "Filter by name, package ID, author, or version",
           "git_subscribed": "Git subscription added",
           "loading": "Reading recommended list...",
+          "no_deploy_source": "This recommendation has no supported Git or archive deployment method.",
           "not_recommended": "Not recommended currently",
           "not_recommended_tooltip": "This item may be temporarily incompatible. Check the description before adding it.",
           "official": "Official content",
           "official_tooltip": "Base game or official DLC does not need subscription",
+          "open_workshop": "Open Workshop page",
+          "source": "Recommendation source",
           "source_all": "All",
           "source_catalog": "Catalog",
           "source_summary": "Recommended sources: {total} items / {sourceCount} sources",
@@ -6983,79 +6975,68 @@
           "workshop_badge": "Workshop",
           "workshop_subscribed": "Workshop subscribed"
         },
-        "dependency": {
-          "add_git": "Add Git subscription",
-          "can_add_git": "Can add Git subscription",
-          "can_subscribe_workshop": "Can subscribe to Workshop",
-          "git_already_added": "This dependency already has a Git subscription",
-          "missing_source": "No directly addable source found",
-          "official": "Base game or official DLC; no subscription needed",
-          "subscribe_workshop": "Subscribe Workshop dependency",
-          "unsubscribe_workshop": "Unsubscribe Workshop dependency"
-        },
         "deploy": {
-          "no_release_cache": "Could not fetch Release version info, and no usable cache is available",
-          "skip_metadata_refresh": "Git repository info query failed. Skipping metadata refresh and deploying the current branch directly.",
+          "active": "Active deployment method",
+          "current": "Up to date",
+          "redeploy": "Redeploy",
+          "release": "Deploy release",
+          "release_button_hint": "Deploys the selected release package.",
+          "release_hint": "Deploy a package published by the project for a straightforward installation.",
+          "source": "Deploy source",
+          "source_button_hint": "Deploys the latest commit from the selected branch.",
+          "source_hint": "Deploy source from the selected branch to the local mods folder.",
           "started": "Data transfer started. Check progress in the bottom status bar.",
-          "use_cached_release": "Git repository info query failed. Continuing deployment with cached Release version."
+          "update": "Update deployment"
         },
         "detail": {
-          "default_branch": "Default branch",
-          "dependencies": "Dependencies",
-          "install_type": "Install type",
-          "rimworld_versions": "RimWorld:"
+          "install_type": "Deployment source",
+          "package_id": "Package ID",
+          "rimworld_versions": "RimWorld:",
+          "version": "Local version"
         },
         "empty": {
           "select_or_add": "Select or Add a Repository"
         },
         "input": {
-          "branch": "Branch (leave blank for the default branch)",
           "parse": "Parse URL",
           "placeholder": "Paste public Git repository URL, e.g. https://github.com/user/repo (supports GitHub / GitLab / GitGud)",
           "supported_tooltip": "Supported repositories: GitHub, GitLab, GitGud."
         },
-        "install_type": {
-          "git_repo": "Git repository",
-          "zip_link": "Zip direct link"
-        },
-        "preview": {
-          "latest_release": "Latest: {version}",
-          "meta": "Author: {owner} | Default branch: {branch}",
-          "release": {
-            "description": "Get the latest release; if no release archive is provided, download the source for its tag.",
-            "failed": "Could not read release information. You can still sync the source branch.",
-            "none": "This repository has no Release yet",
-            "title": "Fetch release build (Release)"
-          },
-          "source": {
-            "description": "Fetch the latest branch code. Good for test mods that update frequently or have no Release.",
-            "title": "Sync source branch (Source)"
-          }
+        "loading": "Loading repository information...",
+        "local": {
+          "status": "Update status",
+          "tab": "Local information"
         },
         "readme": {
-          "error": "Failed to read README. Check network connection, repository URL, and branch name, then try again.",
+          "empty": "No README is available for this repository",
           "loading": "Reading README..."
         },
         "refresh": {
           "tooltip": "Refresh current list"
+        },
+        "remote": {
+          "tab": "Repository details"
         },
         "remove": {
           "confirm": "Remove",
           "message": "Remove Git subscription “{name}”?\nDownloaded local files will not be deleted.",
           "title": "Remove subscription"
         },
+        "selection": {
+          "asset": "Release package",
+          "asset_required": "Select a release file, then deploy again",
+          "directory": "Mod folder",
+          "directory_required": "Select a mod directory, then deploy again",
+          "release_version": "Release version"
+        },
         "status": {
-          "branch_changed": "Tracked branch changed",
+          "branch_changed": "Deployment settings differ",
           "current": "Up to date",
           "installed": "Installed",
           "missing": "Local files missing",
           "not_deployed": "Not deployed",
           "unknown": "Status unknown",
           "upgrade": "Upgrade available"
-        },
-        "subscribe": {
-          "catalog_success": "Catalog item subscribed successfully",
-          "repo_success": "Repository subscribed successfully"
         },
         "tabs": {
           "recommend": "Recommended"

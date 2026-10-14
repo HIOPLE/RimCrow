@@ -148,7 +148,7 @@ from backend.utils.profile_runtime import resolve_profile_runtime_capabilities
 from backend.managers.mgr_steam_api import SteamWebAPI
 from backend.translation import DEFAULT_TRANSLATION_PROVIDER, TranslationManager
 from backend.translation.contracts import TranslationDocument
-from backend.managers.mgr_github import GithubManager
+from backend.managers.mgr_github import GithubManager, GitSelectionRequired
 from backend.managers.mgr_maintenance import MaintenanceManager
 from backend.managers.mgr_data_bundle import DataBundleManager
 from backend.managers.mgr_mod_package import ModPackageManager
@@ -659,6 +659,8 @@ class API:
         self.game_monitor = GameMonitor(self)
         self.download_mgr = DownloadManager()
         self.github_mgr = GithubManager()
+        self.github_mgr.recover_pending_installs()
+        self.github_mgr.migrate_subscription_records()
         self.file_mgr = file_mgr
         self.steam_mgr = SteamManager()
         _log_startup_perf("API 初始化", "core_managers_ready", init_start_at)
@@ -8500,9 +8502,9 @@ class API:
     # Git 仓库相关接口
     # ==========================================
     @log_api_call
-    def github_fetch_info(self, url: str, source_branch: str = ""):
+    def github_fetch_info(self, url: str, source_branch: str = "", force_refresh: bool = False, source_ref_type: str = "branch"):
         """解析并获取远程 Git 仓库信息"""
-        res = self.github_mgr.fetch_repo_info(url, source_branch=source_branch)
+        res = self.github_mgr.fetch_repo_info(url, source_branch=source_branch, force_refresh=force_refresh, source_ref_type=source_ref_type)
         if "error" in res:
             return ApiResponse.error(
                 "获取 Git 仓库信息失败",
@@ -8513,12 +8515,24 @@ class API:
         return ApiResponse.success(res)
 
     @log_api_call
-    def github_fetch_branches(self, url: str) -> dict[str, Any]:
+    def github_fetch_browser_info(self, url: str, source_branch: str = "", source_ref_type: str = "branch") -> dict[str, Any]:
+        """统一读取 Git 浏览页所需的仓库信息和 README。"""
+        try:
+            result = self.github_mgr.fetch_repo_browser_info(url, source_branch=source_branch, source_ref_type=source_ref_type)
+            if "error" in result:
+                return ApiResponse.error("获取 Git 仓库信息失败", code="GITHUB.INFO_FETCH_FAILED", data=result, user_message=_default_user_error_message(result["error"]))
+            return ApiResponse.success(result)
+        except Exception as e:
+            logger.error("获取 Git 仓库浏览信息失败: url=%s error=%s", url, e, exc_info=True)
+            return ApiResponse.error("获取 Git 仓库浏览信息失败", code="GITHUB.BROWSER_FETCH_FAILED", detail=e, context={"url": url}, user_message=_default_user_error_message(str(e)))
+
+    @log_api_call
+    def github_fetch_branches(self, url: str, ref_type: str = "branch") -> dict[str, Any]:
         """按用户操作探测分支，不在普通订阅刷新中扫描全部分支。"""
         identity = self.github_mgr.parse_git_repo_url(url)
         if not identity:
             return ApiResponse.error(tr("api.github.invalid_url", "无效的 Git 仓库链接"))
-        return ApiResponse.success({"repo_url": identity.url, "branches": self.github_mgr.fetch_repo_branches(identity.url)})
+        return ApiResponse.success({"repo_url": identity.url, "branches": self.github_mgr.fetch_repo_branches(identity.url, ref_type=ref_type)})
 
     @log_api_call
     def github_get_provider_catalog(self, url: str = "", force_refresh: bool = False):
@@ -8538,6 +8552,13 @@ class API:
             logger.error("获取 Git 仓库 README 失败: %s", e, exc_info=True)
             return ApiResponse.error("获取 Git 仓库 README 失败", code="GITHUB.README_FETCH_FAILED", detail=e, context={"url": url, "source_branch": source_branch}, user_message=tr("api.github.readme_fetch_failed", "获取 Git 仓库 README 失败。请检查网络连接、仓库地址和分支名称后重试。"))
 
+    @staticmethod
+    def _normalize_github_install_options(value: Any, default_ref_type: str = "branch") -> dict[str, str]:
+        raw = value if isinstance(value, dict) else {}
+        options = {key: str(raw.get(key) or "").strip() for key in ("ref_type", "asset_name", "source_subpath")}
+        options["ref_type"] = options["ref_type"] or str(default_ref_type or "branch").strip() or "branch"
+        return options
+
     @log_api_call
     def github_subscribe(self, payload: dict[str, Any]) -> dict[str, Any]:
         """添加订阅到数据库"""
@@ -8548,10 +8569,27 @@ class API:
         provider, host = self.github_mgr.detect_repo_provider(url)
         install_type = str(payload.get("install_type") or "source").strip() or "source"
         target_branch = str(payload.get("default_branch") or info.get("latest_source_branch") or info.get("default_branch") or "").strip()
+        options = self._normalize_github_install_options(payload.get("install_options"), info.get("source_ref_type") or "branch")
+        options["source_subpath"] = options["source_subpath"] or str(info.get("source_subpath") or "")
         if install_type != "zip":
-            identity, target_branch = self.github_mgr.resolve_repo_link(url, target_branch)
+            identity, target_branch, options["ref_type"], link_subpath = self.github_mgr.resolve_repo_location(url, target_branch, options["ref_type"])
+            options["source_subpath"] = options["source_subpath"] or link_subpath
             url = identity.url
-            if install_type == "source" and (not target_branch or info.get("source_status") == "missing"):
+            provider, host = identity.provider, identity.host
+            info_url = str(info.get("repo_url") or "").strip().rstrip("/").lower()
+            info_ref = str(info.get("latest_source_branch") or "").strip()
+            info_matches = info_url == url.lower() and (
+                install_type != "source" or (
+                    info.get("source_status") == "available"
+                    and info_ref == target_branch
+                )
+            )
+            if not info_matches:
+                info = self.github_mgr.fetch_repo_info(url, source_branch=target_branch, source_ref_type=options["ref_type"], force_refresh=True)
+                if "error" in info:
+                    return ApiResponse.error(str(info["error"]))
+            target_branch = target_branch or str(info.get("latest_source_branch") or "")
+            if install_type == "source" and (not target_branch or info.get("source_status") != "available"):
                 return ApiResponse.error(tr("api.github.branch_required", "未找到目标分支，请探测并选择有效分支后重试。"))
 
         with db.atomic():
@@ -8560,11 +8598,11 @@ class API:
                 defaults={
                     "provider": str(payload.get("provider") or info.get("provider") or provider),
                     "host": str(payload.get("host") or info.get("host") or host),
-                    "owner": payload.get("owner"),
-                    "repo_name": payload.get("repo"),
+                    "owner": info.get("owner") or payload.get("owner") or "",
+                    "repo_name": info.get("repo") or payload.get("repo") or "",
                     "target_branch": target_branch,
                     "install_type": install_type,
-                    "installed_version": installed_version,
+                    "install_options": options,
                     "online_info_cache": info,
                     "last_sync_time": current_ms(),
                 }
@@ -8575,14 +8613,13 @@ class API:
                 # 再次订阅同一仓库时，更新监听策略和最新在线缓存，但不擅自覆盖已部署版本。
                 record.provider = str(payload.get("provider") or info.get("provider") or provider)
                 record.host = str(payload.get("host") or info.get("host") or host)
-                record.owner = payload.get("owner") or record.owner
-                record.repo_name = payload.get("repo") or record.repo_name
+                record.owner = info.get("owner") or record.owner
+                record.repo_name = info.get("repo") or record.repo_name
                 record.target_branch = target_branch
                 record.install_type = install_type
                 record.online_info_cache = info
                 record.last_sync_time = current_ms()
-                if installed_version:
-                    record.installed_version = installed_version
+                record.install_options = options
                 record.save()
         download_version = installed_version
         if install_type == "source":
@@ -8591,58 +8628,30 @@ class API:
             download_version = str(info.get("catalog_signature") or "").strip()
         elif install_type == "release":
             download_version = installed_version or str(info.get("latest_release_tag") or "").strip()
-        download_result = self.github_trigger_download(url, install_type, download_version)
+        download_result = self.github_trigger_download(url, install_type, download_version, options)
         if download_result.get("status") != "success":
             return download_result
-        return self.github_get_subscribed() # 返回最新列表
+        return download_result
 
     @log_api_call
     def github_get_subscribed(self):
         """获取所有已订阅的 Git 仓库"""
         records = list(GithubModRecord.select().dicts())
-        missing_urls: list[str] = []
-        latest_missing_time: dict[str, int] = {}
-        latest_present_time: dict[str, int] = {}
-        if records:
-            repo_urls = [str(r.get("repo_url") or "") for r in records if str(r.get("repo_url") or "")]
-        else:
-            repo_urls = []
-        if repo_urls:
-            latest_logs = (
-                GithubTimeline
-                .select(GithubTimeline.repo_url, GithubTimeline.action, GithubTimeline.time)
-                .where(GithubTimeline.repo_url.in_(repo_urls))
-                .order_by(GithubTimeline.repo_url, GithubTimeline.time.desc())
-            )
-            for log in latest_logs:
-                if log.action == "missing":
-                    latest_missing_time.setdefault(log.repo_url, int(log.time or 0))
-                elif log.action == "success":
-                    latest_present_time.setdefault(log.repo_url, int(log.time or 0))
         for r in records:
             provider, host = self.github_mgr.detect_repo_provider(r.get("repo_url"))
             r["provider"] = r.get("provider") or provider
             r["host"] = r.get("host") or host
             # 将缓存的字典暴露给前端的 online_info 字段
             r["online_info"] = r.get("online_info_cache", {})
-            repo_url = str(r.get("repo_url") or "")
             local_folder = str(r.get("local_folder") or "").strip()
             if local_folder:
                 local_path = _resolve_github_local_path(local_folder)
                 local_exists = bool(local_path and os.path.exists(local_path))
                 r["local_path"] = local_path
                 r["local_exists"] = local_exists
-                last_missing = latest_missing_time.get(repo_url, 0)
-                last_present = latest_present_time.get(repo_url, 0)
-                if not local_exists and last_present >= last_missing:
-                    missing_urls.append(repo_url)
             else:
                 r["local_exists"] = False
-        if missing_urls:
-            with db.atomic():
-                for repo_url in missing_urls:
-                    self.github_mgr.record_timeline(repo_url, "missing", "扫描时发现本地目录已不存在")
-        self._schedule_github_subs_refresh(records)
+            r["backend_status"] = self.github_mgr.subscription_status(r)
 
         return ApiResponse.success(records)
 
@@ -8676,9 +8685,13 @@ class API:
             if not records: return
             
             updated_records = {}
+            records_by_url = {record["repo_url"]: record for record in records}
             failures: list[dict[str, Any]] = []
             failure_codes: dict[str, int] = {}
             def record_failure(repo_url: str, error_code: str, diagnostic: Any):
+                cached = dict(records_by_url[repo_url].get("online_info_cache") or {})
+                cached.update(source_status="error", release_status="error", info_source="record_cache", fetch_warning=str(diagnostic or ""))
+                updated_records[repo_url] = cached
                 resolved_code = str(error_code or "GIT.REQUEST_FAILED").strip() or "GIT.REQUEST_FAILED"
                 failure_codes[resolved_code] = failure_codes.get(resolved_code, 0) + 1
                 if len(failures) < 8:
@@ -8698,7 +8711,7 @@ class API:
                 source_branch = ""
                 if str(record.get("install_type") or "").strip() == "source":
                     source_branch = str(record.get("target_branch") or "").strip()
-                info = self.github_mgr.fetch_repo_info(repo_url, source_branch=source_branch)
+                info = self.github_mgr.fetch_repo_info(repo_url, source_branch=source_branch, source_ref_type=(record.get("install_options") or {}).get("ref_type") or "branch")
                 return repo_url, info
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor(max_workers=5) as executor:
@@ -8746,10 +8759,20 @@ class API:
             current_time = int(time.time() * 1000)
             with db.atomic():
                 for repo_url, info in updated_records.items():
-                    GithubModRecord.update(
+                    old = records_by_url[repo_url]
+                    updated = GithubModRecord.update(
                         online_info_cache=info,
                         last_sync_time=current_time
-                    ).where(GithubModRecord.repo_url == repo_url).execute()
+                    ).where((GithubModRecord.repo_url == repo_url) & (GithubModRecord.target_branch == old.get("target_branch", "")) &
+                            (GithubModRecord.install_type == old.get("install_type", "source")) & (GithubModRecord.install_options == (old.get("install_options") or {}))).execute()
+                    if updated:
+                        current = GithubModRecord.get_by_id(repo_url).__data__
+                        info["subscription_status"] = self.github_mgr.subscription_status(current)
+                        info["tracking_ref"] = current["target_branch"]
+                        info["tracking_ref_type"] = (current.get("install_options") or {}).get("ref_type") or "branch"
+                    else:
+                        info["discarded"] = True
+            updated_records = {url: info for url, info in updated_records.items() if not info.get("discarded")}
             # 【核心】通过 EventBus 将最新数据推给前端 Vue
             EventBus.emit('github-online-update', updated_records)
             logger.info(f"后台 Git 仓库数据刷新完成，已推送 {len(updated_records)} 条更新")
@@ -8758,12 +8781,17 @@ class API:
                 self._github_subs_refresh_running = False
 
     @log_api_call
-    def github_trigger_download(self, url: str, install_type: str, version: str):
+    def github_trigger_download(self, url: str, install_type: str, version: str, install_options: dict[str, Any]):
         """触发下载与安装流程"""
+        options = self._normalize_github_install_options(install_options)
+        GithubModRecord.update(install_options=options).where(GithubModRecord.repo_url == url).execute()
         if str(install_type or "").strip() == "zip":
             task_id = self.github_mgr.install_catalog_zip_mod(self.download_mgr, url)
         else:
-            task_id = self.github_mgr.install_repo_mod(self.download_mgr, url, install_type, version)
+            try:
+                task_id = self.github_mgr.install_repo_mod(self.download_mgr, url, install_type, version, install_options=options)
+            except GitSelectionRequired as exc:
+                return ApiResponse.error(str(exc), data={"selection": {"repo_url": url, "kind": exc.kind, "candidates": exc.candidates}})
         return ApiResponse.success({"task_id": task_id}, message=tr("api.github.deploy_started", "Git 订阅部署任务已启动"))
 
     @log_api_call

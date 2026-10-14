@@ -746,7 +746,8 @@ class DataBundleManager:
                 "owner": record.get("owner"),
                 "repo_name": record.get("repo_name"),
                 "install_type": record.get("install_type") or "source",
-                "target_branch": record.get("target_branch") or "main",
+                "target_branch": record.get("target_branch") or "",
+                "install_options": record.get("install_options") or {},
             })
 
         collections = []
@@ -894,7 +895,8 @@ class DataBundleManager:
                     "owner": str(repo.get("owner") or "").strip(),
                     "repo_name": str(repo.get("repo_name") or "").strip(),
                     "install_type": str(repo.get("install_type") or "source").strip() or "source",
-                    "target_branch": str(repo.get("target_branch") or "main").strip() or "main",
+                    "target_branch": str(repo.get("target_branch") or "").strip(),
+                    "install_options": dict(repo.get("install_options") or {}),
                 }
                 if existing:
                     GithubModRecord.update(
@@ -904,6 +906,7 @@ class DataBundleManager:
                         repo_name=values["repo_name"],
                         install_type=values["install_type"],
                         target_branch=values["target_branch"],
+                        install_options=values["install_options"],
                     ).where(GithubModRecord.repo_url == repo_url).execute()
                 else:
                     GithubModRecord.create(**values)

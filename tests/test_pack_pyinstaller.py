@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -127,7 +128,7 @@ class TestPackPyInstaller(unittest.TestCase):
         docs_dir = self.temp_dir / "docs"
 
         def fake_run(command, **kwargs):
-            self.assertEqual(command, ["python", "local_tools/build_docs_pdf.py", "--output-dir", "docs"])
+            self.assertEqual(command, [sys.executable, "./local_tools/build_docs_pdf.py", "--output-dir", "docs"])
             docs_dir.mkdir(parents=True)
             (docs_dir / "manual.pdf").write_text("pdf", encoding="utf-8")
             return subprocess.CompletedProcess(command, 0, stdout="ok\n")
@@ -138,8 +139,7 @@ class TestPackPyInstaller(unittest.TestCase):
                 output_dir=docs_dir,
                 docs_config={
                     "command": [
-                        "python",
-                        "local_tools/build_docs_pdf.py",
+                        "./local_tools/build_docs_pdf.py",
                         "--output-dir", "docs",
                     ],
                 },
@@ -147,6 +147,21 @@ class TestPackPyInstaller(unittest.TestCase):
 
         self.assertIsNone(result)
         self.assertTrue((docs_dir / "manual.pdf").exists())
+
+    def test_build_release_docs_uses_configured_command_python(self):
+        def fake_run(command, **kwargs):
+            self.assertEqual(command, ["custom-python.exe", "./local_tools/build_docs_pdf.py"])
+            return subprocess.CompletedProcess(command, 0, stdout="ok\n")
+
+        with patch("pack_pyinstaller.subprocess.run", side_effect=fake_run):
+            pack_pyinstaller.build_release_docs(
+                project_root=self.temp_dir,
+                output_dir=self.temp_dir / "docs",
+                docs_config={
+                    "command_python_executable": "custom-python.exe",
+                    "command": ["./local_tools/build_docs_pdf.py"],
+                },
+            )
 
     def test_resolve_upx_dir_uses_configured_path(self):
         upx_dir = self.temp_dir / "upx"

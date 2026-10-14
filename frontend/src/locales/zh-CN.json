@@ -713,7 +713,6 @@
       "steam_still_running": "Steam 仍在运行，继续等待其退出。"
     },
     "github": {
-      "branch_link_unresolved": "无法确定链接中的分支，请探测并选择分支，或手动填写分支名称。",
       "branch_required": "未找到目标分支，请探测并选择有效分支后重试。",
       "deploy_started": "Git 订阅部署任务已启动",
       "invalid_url": "无效的 Git 仓库链接",
@@ -6935,9 +6934,6 @@
       },
       "github": {
         "action": {
-          "create_catalog_subscription": "建立清单订阅",
-          "create_subscription": "建立订阅",
-          "parse_recommended_repo": "解析推荐仓库",
           "parse_repo": "解析 Git 仓库链接",
           "request_transfer": "请求数据传输"
         },
@@ -6946,35 +6942,31 @@
           "open_original": "打开原始地址"
         },
         "active": {
-          "current_mode": "当前模式: {mode}",
-          "deploy_latest": "获取并部署最新",
           "deploy_now": "立即部署",
-          "deploy_tooltip": "获取并部署当前订阅",
-          "installed_version": "已部署版本: {version}",
           "local_audit_log": "本地执行追踪 (Local Audit Log)",
           "no_logs": "暂无追踪记录"
         },
         "branch": {
-          "confirm": "将 {repo} 切换到 {branch} 并重新部署，当前本地模组目录中的文件会被覆盖。是否继续？",
           "detect": "探测远端分支",
           "empty": "该仓库没有可用分支",
           "label": "分支",
-          "missing": "未找到目标分支或提交，请探测并选择有效分支。",
-          "switch": "切换并部署"
+          "switch": "切换分支"
         },
         "catalog": {
-          "add_git_subscription": "添加为 Git 订阅",
-          "add_zip_subscription": "添加为 Git 订阅并部署 zip",
           "branch": "分支：{branch}",
           "cache_badge": "缓存",
+          "category": "分类",
           "empty": "没有匹配的推荐项",
           "filter_placeholder": "筛选名称、包名、作者或版本",
           "git_subscribed": "已添加 Git 订阅",
           "loading": "正在读取推荐列表...",
+          "no_deploy_source": "该推荐项没有可用的 Git 仓库或压缩包部署方式。",
           "not_recommended": "当前不建议使用",
           "not_recommended_tooltip": "该项目可能暂时不兼容，建议确认说明后再添加",
           "official": "官方内容",
           "official_tooltip": "游戏本体或官方 DLC 不需要订阅",
+          "open_workshop": "打开创意工坊页面",
+          "source": "推荐源",
           "source_all": "全部",
           "source_catalog": "清单",
           "source_summary": "推荐来源: {total} 项 / {sourceCount} 个来源",
@@ -6983,79 +6975,68 @@
           "workshop_badge": "工坊",
           "workshop_subscribed": "已订阅创意工坊"
         },
-        "dependency": {
-          "add_git": "添加 Git 订阅",
-          "can_add_git": "可添加 Git 订阅",
-          "can_subscribe_workshop": "可订阅创意工坊",
-          "git_already_added": "该依赖已添加 Git 订阅",
-          "missing_source": "没有找到可直接添加的来源",
-          "official": "游戏本体或官方 DLC，不需要订阅",
-          "subscribe_workshop": "订阅创意工坊依赖",
-          "unsubscribe_workshop": "取消订阅创意工坊依赖"
-        },
         "deploy": {
-          "no_release_cache": "无法获取 Release 版本信息，当前也没有可用缓存",
-          "skip_metadata_refresh": "Git 仓库信息查询失败，已跳过元数据刷新，直接按当前分支继续部署",
+          "active": "当前部署方式",
+          "current": "已是最新",
+          "redeploy": "重新部署",
+          "release": "部署发行版",
+          "release_button_hint": "发行版部署会使用选定版本的打包文件。",
+          "release_hint": "使用项目发布的打包文件部署，适合普通用户快速安装。",
+          "source": "部署源码",
+          "source_button_hint": "源码部署会跟随当前分支的最新提交。",
+          "source_hint": "从选定分支读取源码并部署到本地模组目录。",
           "started": "已开始获取数据流，请在底部状态栏查看进度",
-          "use_cached_release": "Git 仓库信息查询失败，已改用本地缓存的 Release 版本继续部署"
+          "update": "更新部署"
         },
         "detail": {
-          "default_branch": "默认分支",
-          "dependencies": "依赖项",
-          "install_type": "安装类型",
-          "rimworld_versions": "RimWorld："
+          "install_type": "部署来源",
+          "package_id": "包名",
+          "rimworld_versions": "RimWorld：",
+          "version": "本地版本"
         },
         "empty": {
           "select_or_add": "选择或添加仓库"
         },
         "input": {
-          "branch": "分支（留空使用默认分支）",
           "parse": "解析地址",
           "placeholder": "粘贴公开 Git 仓库地址 如: https://github.com/user/repo (支持 GitHub / GitLab / GitGud)",
           "supported_tooltip": "支持以下仓库：GitHub、GitLab、GitGud。"
         },
-        "install_type": {
-          "git_repo": "Git 仓库",
-          "zip_link": "Zip 直链"
-        },
-        "preview": {
-          "latest_release": "最新：{version}",
-          "meta": "作者: {owner} | 默认分支: {branch}",
-          "release": {
-            "description": "获取最新发行版本；没有发行包时获取对应标签的源码。",
-            "failed": "发行版信息读取失败，可继续同步源码分支",
-            "none": "该仓库尚未发布任何 Release",
-            "title": "获取发行版 (Release)"
-          },
-          "source": {
-            "description": "获取分支最新代码。适合频繁更新或未发布 Release 的测试版模组。",
-            "title": "同步源码分支 (Source)"
-          }
+        "loading": "正在读取仓库信息...",
+        "local": {
+          "status": "更新状态",
+          "tab": "本地信息"
         },
         "readme": {
-          "error": "读取 README 失败。请检查网络连接、仓库地址和分支名称后重试。",
+          "empty": "该仓库没有可读取的 README",
           "loading": "正在读取 README..."
         },
         "refresh": {
           "tooltip": "刷新当前列表"
+        },
+        "remote": {
+          "tab": "仓库解析"
         },
         "remove": {
           "confirm": "移除",
           "message": "确定要移除 Git 订阅「{name}」吗？\n本地已下载文件不会被删除。",
           "title": "移除订阅"
         },
+        "selection": {
+          "asset": "发行包文件",
+          "asset_required": "请选择发行包文件后重新部署",
+          "directory": "模组目录",
+          "directory_required": "请选择模组目录后重新部署",
+          "release_version": "发行版本"
+        },
         "status": {
-          "branch_changed": "跟踪分支不同",
+          "branch_changed": "部署设置不同",
           "current": "已是最新",
           "installed": "已安装",
           "missing": "本地文件缺失",
           "not_deployed": "未部署",
           "unknown": "状态未知",
           "upgrade": "可升级"
-        },
-        "subscribe": {
-          "catalog_success": "清单项已成功订阅",
-          "repo_success": "仓库已成功订阅"
         },
         "tabs": {
           "recommend": "推荐列表"

@@ -713,7 +713,6 @@
       "steam_still_running": "Steam 仍在運行，繼續等待其退出。"
     },
     "github": {
-      "branch_link_unresolved": "無法確定連結中的分支，請探測並選擇分支，或手動填寫分支名稱。",
       "branch_required": "未找到目標分支，請探測並選擇有效分支後重試。",
       "deploy_started": "Git 訂閱部署任務已啟動",
       "invalid_url": "無效的 Git 倉庫連結",
@@ -6935,9 +6934,6 @@
       },
       "github": {
         "action": {
-          "create_catalog_subscription": "建立清單訂閱",
-          "create_subscription": "建立訂閱",
-          "parse_recommended_repo": "解析推薦倉庫",
           "parse_repo": "解析 Git 倉庫連結",
           "request_transfer": "請求資料傳輸"
         },
@@ -6946,35 +6942,31 @@
           "open_original": "打開原始地址"
         },
         "active": {
-          "current_mode": "目前模式: {mode}",
-          "deploy_latest": "獲取並部署最新",
           "deploy_now": "立即部署",
-          "deploy_tooltip": "獲取並部署目前訂閱",
-          "installed_version": "已部署版本: {version}",
           "local_audit_log": "本地執行追蹤 (Local Audit Log)",
           "no_logs": "暫無追蹤記錄"
         },
         "branch": {
-          "confirm": "將 {repo} 切換到 {branch} 並重新部署，目前本機模組目錄中的檔案會被覆寫。是否繼續？",
           "detect": "探測遠端分支",
           "empty": "該倉庫沒有可用分支",
           "label": "分支",
-          "missing": "未找到目標分支或提交，請探測並選擇有效分支。",
-          "switch": "切換並部署"
+          "switch": "切換分支"
         },
         "catalog": {
-          "add_git_subscription": "添加為 Git 訂閱",
-          "add_zip_subscription": "添加為 Git 訂閱並部署 zip",
           "branch": "分支：{branch}",
           "cache_badge": "快取",
+          "category": "分類",
           "empty": "沒有匹配的推薦項",
           "filter_placeholder": "篩選名稱、包名、作者或版本",
           "git_subscribed": "已添加 Git 訂閱",
           "loading": "正在讀取推薦列表...",
+          "no_deploy_source": "此推薦項目沒有可用的 Git 儲存庫或壓縮檔部署方式。",
           "not_recommended": "目前不建議使用",
           "not_recommended_tooltip": "該項目可能暫時不兼容，建議確認說明後再添加",
           "official": "官方內容",
           "official_tooltip": "遊戲本體或官方 DLC 不需要訂閱",
+          "open_workshop": "開啟創意工坊頁面",
+          "source": "推薦來源",
           "source_all": "全部",
           "source_catalog": "清單",
           "source_summary": "推薦來源: {total} 項 / {sourceCount} 個來源",
@@ -6983,69 +6975,62 @@
           "workshop_badge": "工坊",
           "workshop_subscribed": "已訂閱創意工坊"
         },
-        "dependency": {
-          "add_git": "添加 Git 訂閱",
-          "can_add_git": "可添加 Git 訂閱",
-          "can_subscribe_workshop": "可訂閱創意工坊",
-          "git_already_added": "該依賴已添加 Git 訂閱",
-          "missing_source": "沒有找到可直接添加的來源",
-          "official": "遊戲本體或官方 DLC，不需要訂閱",
-          "subscribe_workshop": "訂閱創意工坊依賴",
-          "unsubscribe_workshop": "取消訂閱創意工坊依賴"
-        },
         "deploy": {
-          "no_release_cache": "無法獲取 Release 版本資訊，目前也沒有可用快取",
-          "skip_metadata_refresh": "Git 倉庫資訊查詢失敗，已跳過元資料重新整理，直接按目前分支繼續部署",
+          "active": "目前部署方式",
+          "current": "已是最新版本",
+          "redeploy": "重新部署",
+          "release": "部署發行版",
+          "release_button_hint": "使用所選版本的發行套件部署。",
+          "release_hint": "使用專案發布的套件部署，適合一般使用者快速安裝。",
+          "source": "部署原始碼",
+          "source_button_hint": "原始碼部署會跟隨目前分支的最新提交。",
+          "source_hint": "從所選分支讀取原始碼並部署至本機模組資料夾。",
           "started": "已開始獲取資料流，請在底部狀態欄查看進度",
-          "use_cached_release": "Git 倉庫資訊查詢失敗，已改用本地快取的 Release 版本繼續部署"
+          "update": "更新部署"
         },
         "detail": {
-          "default_branch": "預設分支",
-          "dependencies": "依賴項",
-          "install_type": "安裝類型",
-          "rimworld_versions": "RimWorld："
+          "install_type": "部署來源",
+          "package_id": "套件名稱",
+          "rimworld_versions": "RimWorld：",
+          "version": "本機版本"
         },
         "empty": {
           "select_or_add": "選擇或添加倉庫"
         },
         "input": {
-          "branch": "分支（留空使用預設分支）",
           "parse": "解析地址",
           "placeholder": "粘貼公開 Git 倉庫地址 如: https://github.com/user/repo (支持 GitHub / GitLab / GitGud)",
           "supported_tooltip": "支持以下倉庫：GitHub、GitLab、GitGud。"
         },
-        "install_type": {
-          "git_repo": "Git 倉庫",
-          "zip_link": "Zip 直鏈"
-        },
-        "preview": {
-          "latest_release": "最新：{version}",
-          "meta": "作者: {owner} | 預設分支: {branch}",
-          "release": {
-            "description": "取得最新發行版本；沒有發行包時取得對應標籤的原始碼。",
-            "failed": "發行版資訊讀取失敗，可繼續同步原始碼分支",
-            "none": "該倉庫尚未發佈任何 Release",
-            "title": "獲取發行版 (Release)"
-          },
-          "source": {
-            "description": "獲取分支最新代碼。適合頻繁更新或未發佈 Release 的測試版模組。",
-            "title": "同步源碼分支 (Source)"
-          }
+        "loading": "正在讀取倉庫資訊...",
+        "local": {
+          "status": "更新狀態",
+          "tab": "本機資訊"
         },
         "readme": {
-          "error": "讀取 README 失敗。請檢查網路連接、倉庫地址和分支名稱後重試。",
+          "empty": "該倉庫沒有可讀取的 README",
           "loading": "正在讀取 README..."
         },
         "refresh": {
           "tooltip": "重新整理目前列表"
+        },
+        "remote": {
+          "tab": "儲存庫資訊"
         },
         "remove": {
           "confirm": "移除",
           "message": "確定要移除 Git 訂閱「{name}」嗎？\n本地已下載檔案不會被刪除。",
           "title": "移除訂閱"
         },
+        "selection": {
+          "asset": "發行套件檔案",
+          "asset_required": "請選擇發行包檔案後重新部署",
+          "directory": "模組資料夾",
+          "directory_required": "請選擇模組目錄後重新部署",
+          "release_version": "發行版本"
+        },
         "status": {
-          "branch_changed": "跟蹤分支不同",
+          "branch_changed": "部署設定不同",
           "current": "已是最新",
           "installed": "已安裝",
           "missing": "本地檔案缺失",
@@ -7053,15 +7038,11 @@
           "unknown": "狀態未知",
           "upgrade": "可升級"
         },
-        "subscribe": {
-          "catalog_success": "清單項已成功訂閱",
-          "repo_success": "倉庫已成功訂閱"
-        },
         "tabs": {
           "recommend": "推薦列表"
         },
         "time": {
-          "published": "發佈: {time}",
+          "published": "發布: {time}",
           "updated": "更新: {time}"
         },
         "timeline": {

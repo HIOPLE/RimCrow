@@ -713,7 +713,6 @@
       "steam_still_running": "Steam läuft noch. Ich warte darauf, dass es beendet wird."
     },
     "github": {
-      "branch_link_unresolved": "Der Branch in diesem Link ist nicht eindeutig. Ermitteln und wählen Sie einen Branch oder geben Sie seinen Namen ein.",
       "branch_required": "Ziel-Branch nicht gefunden. Ermitteln und wählen Sie einen gültigen Branch und versuchen Sie es erneut.",
       "deploy_started": "Die Bereitstellungsaufgabe für das Git-Abonnement wurde gestartet",
       "invalid_url": "Ungültige Git-Repository-Adresse",
@@ -6935,9 +6934,6 @@
       },
       "github": {
         "action": {
-          "create_catalog_subscription": "Erstellen Sie ein Katalogabonnement",
-          "create_subscription": "Abonnement erstellen",
-          "parse_recommended_repo": "Analysieren Sie das empfohlene Repository",
           "parse_repo": "Git-Repository-URL analysieren",
           "request_transfer": "Datentransfer anfordern"
         },
@@ -6946,35 +6942,31 @@
           "open_original": "Original-URL öffnen"
         },
         "active": {
-          "current_mode": "Aktueller Modus: {mode}",
-          "deploy_latest": "Aktuelle Version abrufen und bereitstellen",
           "deploy_now": "Jetzt bereitstellen",
-          "deploy_tooltip": "Aktuelles Abonnement abrufen und bereitstellen",
-          "installed_version": "Bereitgestellte Version: {version}",
           "local_audit_log": "Lokales Audit-Protokoll",
           "no_logs": "Keine Prüfaufzeichnungen"
         },
         "branch": {
-          "confirm": "{repo} auf {branch} umstellen und neu bereitstellen? Die Dateien im aktuellen lokalen Mod-Ordner werden überschrieben.",
           "detect": "Remote-Branches ermitteln",
           "empty": "Dieses Repository hat keine verfügbaren Branches",
           "label": "Branch",
-          "missing": "Ziel-Branch oder Commit nicht gefunden. Ermitteln und wählen Sie einen gültigen Branch.",
-          "switch": "Wechseln und bereitstellen"
+          "switch": "Branch wechseln"
         },
         "catalog": {
-          "add_git_subscription": "Als Git-Abonnement hinzufügen",
-          "add_zip_subscription": "Als Git-Abonnement hinzufügen und ZIP bereitstellen",
           "branch": "Zweigstelle: {branch}",
           "cache_badge": "Zwischengespeichert",
+          "category": "Kategorie",
           "empty": "Keine passenden empfohlenen Artikel",
           "filter_placeholder": "Filtern Sie nach Name, Paket-ID, Autor oder Version",
           "git_subscribed": "Git-Abonnement hinzugefügt",
           "loading": "Empfohlene Liste lesen...",
+          "no_deploy_source": "Für diese Empfehlung ist keine unterstützte Bereitstellung über Git oder ein Archiv verfügbar.",
           "not_recommended": "Derzeit nicht empfohlen",
           "not_recommended_tooltip": "Dieses Element ist möglicherweise vorübergehend nicht kompatibel. Überprüfen Sie die Beschreibung, bevor Sie sie hinzufügen.",
           "official": "Offizieller Inhalt",
           "official_tooltip": "Für das Basisspiel oder den offiziellen DLC ist kein Abonnement erforderlich",
+          "open_workshop": "Workshop-Seite öffnen",
+          "source": "Empfehlungsquelle",
           "source_all": "All",
           "source_catalog": "Katalog",
           "source_summary": "Empfohlene Quellen: {total}-Artikel / {sourceCount}-Quellen",
@@ -6983,79 +6975,68 @@
           "workshop_badge": "Workshop",
           "workshop_subscribed": "Workshop abonniert"
         },
-        "dependency": {
-          "add_git": "Git-Abonnement hinzufügen",
-          "can_add_git": "Kann ein Git-Abonnement hinzufügen",
-          "can_subscribe_workshop": "Kann Workshop abonnieren",
-          "git_already_added": "Diese Abhängigkeit verfügt bereits über ein Git-Abonnement",
-          "missing_source": "Keine direkt hinzufügbare Quelle gefunden",
-          "official": "Basisspiel oder offizieller DLC; kein Abonnement erforderlich",
-          "subscribe_workshop": "Abonnieren Sie die Workshop-Abhängigkeit",
-          "unsubscribe_workshop": "Abonnieren Sie die Workshop-Abhängigkeit"
-        },
         "deploy": {
-          "no_release_cache": "Die Release-Versionsinformationen konnten nicht abgerufen werden und es ist kein verwendbarer Cache verfügbar",
-          "skip_metadata_refresh": "Die Abfrage der Git-Repository-Informationen ist fehlgeschlagen. Metadatenaktualisierung überspringen und den aktuellen Zweig direkt bereitstellen.",
+          "active": "Aktive Bereitstellungsmethode",
+          "current": "Auf dem neuesten Stand",
+          "redeploy": "Erneut bereitstellen",
+          "release": "Release bereitstellen",
+          "release_button_hint": "Installiert das Paket der ausgewählten Veröffentlichung.",
+          "release_hint": "Installiert ein vom Projekt veröffentlichtes Paket für eine einfache Einrichtung.",
+          "source": "Quellcode bereitstellen",
+          "source_button_hint": "Installiert den neuesten Commit des ausgewählten Branches.",
+          "source_hint": "Installiert den Quellcode des ausgewählten Branches im lokalen Mod-Ordner.",
           "started": "Die Datenübertragung wurde gestartet. Überprüfen Sie den Fortschritt in der unteren Statusleiste.",
-          "use_cached_release": "Die Abfrage der Git-Repository-Informationen ist fehlgeschlagen. Fortsetzung der Bereitstellung mit zwischengespeicherter Release-Version."
+          "update": "Bereitstellung aktualisieren"
         },
         "detail": {
-          "default_branch": "Standardzweig",
-          "dependencies": "Abhängigkeiten",
-          "install_type": "Installationstyp",
-          "rimworld_versions": "RimWorld:"
+          "install_type": "Bereitstellungsquelle",
+          "package_id": "Paket-ID",
+          "rimworld_versions": "RimWorld:",
+          "version": "Lokale Version"
         },
         "empty": {
           "select_or_add": "Wählen Sie ein Repository aus oder fügen Sie es hinzu"
         },
         "input": {
-          "branch": "Branch (leer lassen für den Standardbranch)",
           "parse": "URL analysieren",
           "placeholder": "Fügen Sie die URL des öffentlichen Git-Repositorys ein, z. B. https://github.com/user/repo (unterstützt GitHub / GitLab / GitGud)",
           "supported_tooltip": "Unterstützte Repositorys: GitHub, GitLab, GitGud."
         },
-        "install_type": {
-          "git_repo": "Git-Repository",
-          "zip_link": "Zip-Direktlink"
-        },
-        "preview": {
-          "latest_release": "Neueste: {version}",
-          "meta": "Autor: {owner} | Standardzweig: {branch}",
-          "release": {
-            "description": "Neueste Veröffentlichung abrufen; ohne Release-Archiv wird der Quellcode des zugehörigen Tags heruntergeladen.",
-            "failed": "Release-Informationen konnten nicht gelesen werden. Der Quellcode-Branch kann weiterhin synchronisiert werden.",
-            "none": "Dieses Repository hat noch kein Release",
-            "title": "Release-Build abrufen (Release)"
-          },
-          "source": {
-            "description": "Rufen Sie den neuesten Filialcode ab. Gut für Test-Mods, die häufig aktualisiert werden oder kein Release haben.",
-            "title": "Quellzweig synchronisieren (Quelle)"
-          }
+        "loading": "Repository-Informationen werden geladen...",
+        "local": {
+          "status": "Update-Status",
+          "tab": "Lokale Informationen"
         },
         "readme": {
-          "error": "README konnte nicht gelesen werden. Überprüfen Sie die Netzwerkverbindung, die Repository-URL und den Filialnamen und versuchen Sie es dann erneut.",
+          "empty": "Für dieses Repository ist keine README verfügbar",
           "loading": "README lesen..."
         },
         "refresh": {
           "tooltip": "Aktuelle Liste aktualisieren"
+        },
+        "remote": {
+          "tab": "Repository-Details"
         },
         "remove": {
           "confirm": "Entfernen",
           "message": "Git-Abonnement „{name}“ entfernen?\nHeruntergeladene lokale Dateien werden nicht gelöscht.",
           "title": "Abonnement entfernen"
         },
+        "selection": {
+          "asset": "Release-Paket",
+          "asset_required": "Wählen Sie eine Release-Datei und stellen Sie erneut bereit",
+          "directory": "Mod-Ordner",
+          "directory_required": "Wählen Sie ein Mod-Verzeichnis und stellen Sie erneut bereit",
+          "release_version": "Release-Version"
+        },
         "status": {
-          "branch_changed": "Verfolgter Zweig geändert",
+          "branch_changed": "Bereitstellungseinstellungen unterscheiden sich",
           "current": "Auf dem neuesten Stand",
           "installed": "Installiert",
           "missing": "Lokale Dateien fehlen",
           "not_deployed": "Nicht bereitgestellt",
           "unknown": "Status unbekannt",
           "upgrade": "Upgrade verfügbar"
-        },
-        "subscribe": {
-          "catalog_success": "Katalogelement erfolgreich abonniert",
-          "repo_success": "Repository erfolgreich abonniert"
         },
         "tabs": {
           "recommend": "Empfohlen"
