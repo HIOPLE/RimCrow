@@ -6989,6 +6989,7 @@
           "select_or_add": "Выберите или добавьте репозиторий"
         },
         "input": {
+          "branch": "Ветка (оставьте пустым для ветки по умолчанию)",
           "parse": "Анализ URL-адреса",
           "placeholder": "Вставьте URL-адрес общедоступного репозитория Git, например. https://github.com/user/repo (поддерживает GitHub/GitLab/GitGud)",
           "supported_tooltip": "Поддерживаемые репозитории: GitHub, GitLab, GitGud."

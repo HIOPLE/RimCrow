@@ -6989,6 +6989,7 @@
           "select_or_add": "Wählen Sie ein Repository aus oder fügen Sie es hinzu"
         },
         "input": {
+          "branch": "Branch (leer lassen für den Standardbranch)",
           "parse": "URL analysieren",
           "placeholder": "Fügen Sie die URL des öffentlichen Git-Repositorys ein, z. B. https://github.com/user/repo (unterstützt GitHub / GitLab / GitGud)",
           "supported_tooltip": "Unterstützte Repositorys: GitHub, GitLab, GitGud."

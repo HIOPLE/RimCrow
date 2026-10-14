@@ -1,5 +1,7 @@
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,6 +35,35 @@ class TestGameLogPathResolution(unittest.TestCase):
     def setUp(self):
         self.temp_dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.temp_dir, ignore_errors=True)
+
+    def test_xml_path_matching_handles_long_line_without_paths(self):
+        pattern = LogAnalyzer().file_pattern
+        self.assertEqual(pattern.findall(r'Failed to load C:\Mods\Example\Defs\Item.xml and /mods/Other.XML'),
+                         [r'\Mods\Example\Defs\Item.xml', '/mods/Other.XML'])
+        result = subprocess.run(
+            [sys.executable, '-c', 'import re,sys; assert not re.findall(sys.argv[1], "A" * 100000, re.IGNORECASE)', pattern.pattern],
+            capture_output=True, text=True, timeout=3,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_text_and_json_log_limits_keep_latest_blocks_and_full_history(self):
+        manager = GameLogManager(SimpleNamespace(user_data_path=str(self.temp_dir)))
+        manager.max_blocks = 5
+        for filename in ('Player.log', 'RimCrow_Realtime.log'):
+            with self.subTest(filename=filename):
+                path = self.temp_dir / filename
+                text = '\n'.join(f'line {idx}\n  at stack {idx}' for idx in range(30)) if filename == 'Player.log' else '\n'.join(
+                    f'{{"level":"INFO","message":"line {idx}","details":""}}' for idx in range(30))
+                path.write_text(text + '\n', encoding='utf-8')
+                self.assertEqual(len(manager._parse_file_to_blocks(str(path))), 5)
+                blocks = manager._parse_file_to_blocks(str(path), keep_all=True, max_keep_blocks=3)
+                self.assertEqual([b['message'] for b in blocks], ['line 27', 'line 28', 'line 29'])
+                self.assertEqual(len(manager._parse_file_to_blocks(str(path), keep_all=True)), 30)
+                if filename == 'Player.log':
+                    self.assertEqual(blocks[-1]['details'], '\n  at stack 29')
+                    self.assertEqual(blocks[-1]['raw_lines'], [59, 60])
+                with patch.object(manager, '_analyze_page'):
+                    self.assertEqual(manager.get_raw_logs_by_lines(str(path), [1])[0]['message'], 'line 0')
 
     def test_windows_default_player_log_paths_prefer_waylith_logs_dir(self):
         fake_home = self.temp_dir / "winhome"

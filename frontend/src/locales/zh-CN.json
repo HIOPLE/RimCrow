@@ -6989,6 +6989,7 @@
           "select_or_add": "选择或添加仓库"
         },
         "input": {
+          "branch": "分支（留空使用默认分支）",
           "parse": "解析地址",
           "placeholder": "粘贴公开 Git 仓库地址 如: https://github.com/user/repo (支持 GitHub / GitLab / GitGud)",
           "supported_tooltip": "支持以下仓库：GitHub、GitLab、GitGud。"

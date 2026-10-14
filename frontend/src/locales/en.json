@@ -6989,6 +6989,7 @@
           "select_or_add": "Select or Add a Repository"
         },
         "input": {
+          "branch": "Branch (leave blank for the default branch)",
           "parse": "Parse URL",
           "placeholder": "Paste public Git repository URL, e.g. https://github.com/user/repo (supports GitHub / GitLab / GitGud)",
           "supported_tooltip": "Supported repositories: GitHub, GitLab, GitGud."

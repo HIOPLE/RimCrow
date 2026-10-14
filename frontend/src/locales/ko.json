@@ -6989,6 +6989,7 @@
           "select_or_add": "저장소 선택 또는 추가"
         },
         "input": {
+          "branch": "브랜치 (비워 두면 기본 브랜치 사용)",
           "parse": "URL 구문 분석",
           "placeholder": "공개 Git 저장소 URL을 붙여넣으세요. 예: https://github.com/user/repo (GitHub / GitLab / GitGud 지원)",
           "supported_tooltip": "지원되는 리포지토리: GitHub, GitLab, GitGud."

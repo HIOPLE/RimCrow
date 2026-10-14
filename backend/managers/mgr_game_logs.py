@@ -121,7 +121,8 @@ class LogAnalyzer:
         # 提取 Mod 包名 (通常格式为 Author.ModName，或者被[] 包裹)
         self.mod_id_pattern = re.compile(r'\[([a-zA-Z0-9\-_]{2,}\.[a-zA-Z0-9\-_]{2,})\]')
         # 提取相关 XML 文件路径
-        self.file_pattern = re.compile(r'([A-Za-z0-9_\-\/\\]+\.xml)', re.IGNORECASE)
+        # 只从路径起点匹配，避免长文本无 .xml 时从每个字符重新回溯。
+        self.file_pattern = re.compile(r'(?<![A-Za-z0-9_\-\/\\])([A-Za-z0-9_\-\/\\]+\.xml)', re.IGNORECASE)
         self.namespace_pattern = re.compile(r'^\s*at(?:\s+\([^)]*\))*\s+([A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*)\.', re.MULTILINE)
         self.ignored_namespaces = {
             'system', 'microsoft', 'mono', 'mscorlib', 'unityengine',
@@ -536,7 +537,7 @@ class GameLogManager(BaseLogReader): # 继承基类
         """按块反查游戏日志，兼容 JSON 与 Player.log 纯文本块。"""
         if not os.path.exists(filepath) or not target_lines: return []
 
-        blocks = self._ensure_cache(filepath, self._parse_file_to_blocks)
+        blocks = self._ensure_cache(filepath, lambda path: self._parse_file_to_blocks(path, keep_all=True), cache_key=f"{filepath}::browse")
 
         target_line_set = set(target_lines)
         matched_blocks = [
@@ -592,6 +593,7 @@ class GameLogManager(BaseLogReader): # 继承基类
             
         # --- 下面保留原有的纯文本流式读取逻辑 (Player.log) ---
         blocks = []
+        limit = max_keep_blocks or (None if keep_all else self.max_blocks)
         try:
             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                 current_block = None
@@ -605,11 +607,14 @@ class GameLogManager(BaseLogReader): # 继承基类
                         current_phase = 'runtime'
                     
                     if line_content.startswith((' ', '\t', 'at ', '(Filename:')) and current_block:
-                        current_block['details'] += '\n' + line_content
+                        current_block['details'].append(line_content)
                         current_block['raw_lines'].append(idx + 1)
                     else:
                         if current_block: 
+                            current_block['details'] = '\n'.join(current_block['details'])
                             self._add_or_merge_block(blocks, current_block)
+                            if limit and len(blocks) > 2 * limit:
+                                del blocks[:-limit]
                         
                         level = 'INFO'
                         if self._patterns['error'].search(line_content): level = 'ERROR'
@@ -617,16 +622,17 @@ class GameLogManager(BaseLogReader): # 继承基类
                         
                         current_block = {
                             'id': generate_log_id(f'playerlog_{idx}', level, line_content),
-                            'timestamp': '', 'level': level, 'message': line_content, 'details': '', 'count': 1,
+                            'timestamp': '', 'level': level, 'message': line_content, 'details': [''], 'count': 1,
                             'raw_lines': [idx + 1], # 文本模式同样注入行号
                             '_log_phase': current_phase,
                         }
                 if current_block:
+                    current_block['details'] = '\n'.join(current_block['details'])
                     self._add_or_merge_block(blocks, current_block)
         except Exception as e:
             logger.error(f"读取文本日志失败：{filepath}，错误：{e}", exc_info=True)
             
-        return blocks if keep_all else blocks[-self.max_blocks:]
+        return blocks[-limit:] if limit else blocks
 
 
 class LogCondenser:
