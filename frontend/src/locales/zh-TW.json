@@ -713,7 +713,10 @@
       "steam_still_running": "Steam 仍在運行，繼續等待其退出。"
     },
     "github": {
+      "branch_link_unresolved": "無法確定連結中的分支，請探測並選擇分支，或手動填寫分支名稱。",
+      "branch_required": "未找到目標分支，請探測並選擇有效分支後重試。",
       "deploy_started": "Git 訂閱部署任務已啟動",
+      "invalid_url": "無效的 Git 倉庫連結",
       "provider_catalog_failed": "獲取 Git 推薦列表失敗。請檢查網路連接、代理設定和推薦源地址，稍後重試。",
       "readme_fetch_failed": "獲取 Git 倉庫 README 失敗。請檢查網路連接、倉庫地址和分支名稱後重試。",
       "subscription_removed": "已移除訂閱記錄",
@@ -2438,6 +2441,7 @@
     "package_transfer": {
       "apply_environment_data": "同時應用環境資料",
       "apply_environment_data_desc": "覆蓋現有環境時，只會替換這個環境的實際使用資料，不會改名稱、說明和綁定關係。新建環境時，會盡量保留原來的環境資訊。",
+      "auto_backup_hint": "匯入前會自動備份軟體資料到 data/backups/all-data-backup.rimcrowdata.zip，每次覆蓋上一份備份。",
       "batch_handling": "批量處理",
       "bundle_size": "壓縮包大小",
       "bundle_summary": "包摘要",
@@ -2472,7 +2476,6 @@
       "folder_name_type": "包內Mod資料夾命名",
       "folder_name_type_desc": "隻影響導出包裡的資料夾名稱，不會改動原始Mod目錄。遇到不適合作為檔案名的字符會自動替換，重名會自動追加序號。",
       "footer": {
-        "data_import": "環境重名時會按你的選擇處理，其它資料仍按原流程導入。",
         "mod_export": "如果同一個模組有多個來源，會優先帶上你目前正在使用的版本，重複副本會自動跳過。",
         "mod_import": "導入到目前環境目錄或管理器目錄時會自動重新整理目前模組列表。缺少本地檔案的模組會跳過並提醒你。"
       },
@@ -2535,6 +2538,9 @@
         "skip": "跳過"
       },
       "rename_placeholder": "留空會自動補一個新名字",
+      "restore_desc": "從備份包還原軟體資料，保留現有環境、存檔和遊戲設定。",
+      "restore_title": "還原軟體資料",
+      "restore_warning": "還原操作說明：把軟體設定、AI 定義、使用者規則、自訂資訊、分組以及訂閱項還原為備份時的狀態，同時刪除該範圍內備份檔案裡不存在的資料。環境、存檔和遊戲設定不會被還原。本次還原不會產生新的備份，原有備份包將保留。",
       "select_game_install": "請選擇一個可用遊戲本體",
       "select_profile_to_overwrite": "請選擇要覆蓋的環境",
       "selected_mod_count": "已選 {count} 個模組。",
@@ -2544,6 +2550,7 @@
       "size_change": "體積變化",
       "start_export": "開始導出",
       "start_import": "開始導入",
+      "start_restore": "開始還原",
       "strategy": {
         "create_all": "全部新建",
         "overwrite_all": "全部覆蓋",
@@ -4827,6 +4834,7 @@
       },
       "dev": {
         "database_recreated": "未找到本地資料庫，已重新創建。",
+        "invalid_data_backup": "該檔案不是軟體資料備份包，請使用「匯入資料包」讀取。",
         "remote_image_cache_cleared": "已清理 {count} 張快取圖片，釋放 {size}",
         "repair_complete_restart_later": "修復已完成，重啟軟體後生效。"
       },
@@ -5279,6 +5287,9 @@
       },
       "data_export": {
         "dependencies": "依賴：{dependencies}"
+      },
+      "dev": {
+        "restore_data_backup": "還原上次匯入前的軟體資料：軟體設定、AI 定義、使用者規則、自訂資訊、分組和訂閱。\n不包含環境、存檔及遊戲設定；還原會覆蓋上述軟體資料，不會再次備份。\n檔案：{path}\n大小：{size}\n備份時間：{time}"
       },
       "external": {
         "git_provider_catalog_sources": "每行一個來源，格式：名稱|URL。留空時使用預設推薦清單。",
@@ -6163,6 +6174,7 @@
         "remote_image_cache": "網路圖片快取",
         "remote_image_cache_desc": "遠程封面圖、截圖和富文字圖片會先寫入本地快取，再由前端通過本地資源服務讀取。",
         "reset_database_now": "立即重置本地資料庫",
+        "restore_data_backup": "還原備份",
         "scope": {
           "profile_active": "目前環境啟用模組（{count}）",
           "profile_active_desc": "只導出目前環境裡已經啟用的模組。",
@@ -6942,6 +6954,14 @@
           "local_audit_log": "本地執行追蹤 (Local Audit Log)",
           "no_logs": "暫無追蹤記錄"
         },
+        "branch": {
+          "confirm": "將 {repo} 切換到 {branch} 並重新部署，目前本機模組目錄中的檔案會被覆寫。是否繼續？",
+          "detect": "探測遠端分支",
+          "empty": "該倉庫沒有可用分支",
+          "label": "分支",
+          "missing": "未找到目標分支或提交，請探測並選擇有效分支。",
+          "switch": "切換並部署"
+        },
         "catalog": {
           "add_git_subscription": "添加為 Git 訂閱",
           "add_zip_subscription": "添加為 Git 訂閱並部署 zip",
@@ -7002,7 +7022,8 @@
           "latest_release": "最新：{version}",
           "meta": "作者: {owner} | 預設分支: {branch}",
           "release": {
-            "description": "獲取作者打包的穩定版。",
+            "description": "取得最新發行版本；沒有發行包時取得對應標籤的原始碼。",
+            "failed": "發行版資訊讀取失敗，可繼續同步原始碼分支",
             "none": "該倉庫尚未發佈任何 Release",
             "title": "獲取發行版 (Release)"
           },

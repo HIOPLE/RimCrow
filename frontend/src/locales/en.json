@@ -713,7 +713,10 @@
       "steam_still_running": "Steam is still running. Waiting for it to exit."
     },
     "github": {
+      "branch_link_unresolved": "Cannot determine the branch in this link. Detect and select a branch, or enter its name.",
+      "branch_required": "Target branch not found. Detect and select a valid branch, then try again.",
       "deploy_started": "Git subscription deployment task started",
+      "invalid_url": "Invalid Git repository URL",
       "provider_catalog_failed": "Failed to get the Git recommendation list. Check the network connection, proxy settings, and recommendation source URL, then try again.",
       "readme_fetch_failed": "Failed to get the Git repository README. Check the network connection, repository URL, and branch name, then try again.",
       "subscription_removed": "Subscription record removed",
@@ -2438,6 +2441,7 @@
     "package_transfer": {
       "apply_environment_data": "Apply environment data too",
       "apply_environment_data_desc": "When overwriting an existing environment, only its actual data is replaced. Name, description, and bindings stay unchanged. New environments try to keep the original package information.",
+      "auto_backup_hint": "Before importing, app data is backed up to data/backups/all-data-backup.rimcrowdata.zip, replacing the previous backup.",
       "batch_handling": "Batch handling",
       "bundle_size": "Package size",
       "bundle_summary": "Package summary",
@@ -2472,7 +2476,6 @@
       "folder_name_type": "Mod folder names inside package",
       "folder_name_type_desc": "Only affects folder names inside the exported package. Original mod directories are not changed. Invalid filename characters are replaced and duplicates get a suffix.",
       "footer": {
-        "data_import": "Same-name environments will be handled according to your choices. Other data follows the normal import flow.",
         "mod_export": "If the same mod has multiple sources, the version currently in use is preferred and duplicate copies are skipped.",
         "mod_import": "Importing into the current environment or manager directory refreshes the current mod list automatically. Mods missing local files are skipped and reported."
       },
@@ -2535,6 +2538,9 @@
         "skip": "Skip"
       },
       "rename_placeholder": "Leave empty to generate a new name automatically",
+      "restore_desc": "Restore app data from the backup while keeping existing profiles, saves and game settings.",
+      "restore_title": "Restore software data",
+      "restore_warning": "Restoration details: app settings, AI definitions, user rules, custom information, groups and subscriptions will return to their backed-up state. Data in these categories that is absent from the backup will be deleted. Profiles, saves and game settings will not be restored. No new backup will be created; the original backup archive will be kept.",
       "select_game_install": "Select an available game install",
       "select_profile_to_overwrite": "Select environment to overwrite",
       "selected_mod_count": "{count} mods selected.",
@@ -2544,6 +2550,7 @@
       "size_change": "Size change",
       "start_export": "Start export",
       "start_import": "Start import",
+      "start_restore": "Start restore",
       "strategy": {
         "create_all": "Create all",
         "overwrite_all": "Overwrite all",
@@ -4827,6 +4834,7 @@
       },
       "dev": {
         "database_recreated": "Local database was not found and has been recreated.",
+        "invalid_data_backup": "This file is not an app data backup. Use “Import data package” to open it.",
         "remote_image_cache_cleared": "Cleared {count} cached images and freed {size}",
         "repair_complete_restart_later": "Repair is complete and will take effect after restart."
       },
@@ -5279,6 +5287,9 @@
       },
       "data_export": {
         "dependencies": "Dependencies: {dependencies}"
+      },
+      "dev": {
+        "restore_data_backup": "Restore app data from before the last import: app settings, AI definitions, user rules, custom information, groups and subscriptions.\nProfiles, saves and game settings are excluded. Restoring replaces the listed app data without creating another backup.\nFile: {path}\nSize: {size}\nBackup time: {time}"
       },
       "external": {
         "git_provider_catalog_sources": "One source per line, format: Name|URL. Leave empty to use the default recommendation list.",
@@ -6163,6 +6174,7 @@
         "remote_image_cache": "Remote image cache",
         "remote_image_cache_desc": "Remote cover images, screenshots, and rich text images are written to local cache first, then read by the frontend through the local asset service.",
         "reset_database_now": "Reset local database now",
+        "restore_data_backup": "Restore backup",
         "scope": {
           "profile_active": "Active Mods in current profile ({count})",
           "profile_active_desc": "Export only active Mods in the current profile.",
@@ -6942,6 +6954,14 @@
           "local_audit_log": "Local audit log",
           "no_logs": "No audit records"
         },
+        "branch": {
+          "confirm": "Switch {repo} to {branch} and redeploy? Files in the current local mod folder will be overwritten.",
+          "detect": "Detect remote branches",
+          "empty": "This repository has no available branches",
+          "label": "Branch",
+          "missing": "Target branch or commit not found. Detect and select a valid branch.",
+          "switch": "Switch and deploy"
+        },
         "catalog": {
           "add_git_subscription": "Add as Git subscription",
           "add_zip_subscription": "Add as Git subscription and deploy zip",
@@ -7002,7 +7022,8 @@
           "latest_release": "Latest: {version}",
           "meta": "Author: {owner} | Default branch: {branch}",
           "release": {
-            "description": "Fetch the stable package published by the author.",
+            "description": "Get the latest release; if no release archive is provided, download the source for its tag.",
+            "failed": "Could not read release information. You can still sync the source branch.",
             "none": "This repository has no Release yet",
             "title": "Fetch release build (Release)"
           },

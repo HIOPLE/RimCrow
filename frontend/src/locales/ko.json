@@ -713,7 +713,10 @@
       "steam_still_running": "Steam가 아직 실행 중입니다. 종료되기를 기다리고 있습니다."
     },
     "github": {
+      "branch_link_unresolved": "링크의 브랜치를 확인할 수 없습니다. 브랜치를 조회하여 선택하거나 이름을 직접 입력하세요.",
+      "branch_required": "대상 브랜치를 찾을 수 없습니다. 유효한 브랜치를 조회하여 선택한 후 다시 시도하세요.",
       "deploy_started": "Git 구독 배포 작업이 시작되었습니다.",
+      "invalid_url": "유효하지 않은 Git 저장소 주소",
       "provider_catalog_failed": "Git 추천 목록을 가져오지 못했습니다. 네트워크 연결, 프록시 설정, 추천 소스 URL을 확인한 후 다시 시도하세요.",
       "readme_fetch_failed": "Git 저장소 README를 가져오지 못했습니다. 네트워크 연결, 저장소 URL, 브랜치 이름을 확인한 후 다시 시도하세요.",
       "subscription_removed": "구독 기록이 삭제됨",
@@ -2438,6 +2441,7 @@
     "package_transfer": {
       "apply_environment_data": "환경 데이터도 적용",
       "apply_environment_data_desc": "기존 환경을 덮어쓰면 실제 데이터만 교체됩니다. 이름, 설명, 바인딩은 변경되지 않습니다. 새로운 환경에서는 원래 패키지 정보를 유지하려고 합니다.",
+      "auto_backup_hint": "가져오기 전에 앱 데이터를 data/backups/all-data-backup.rimcrowdata.zip에 백업하며 이전 백업을 덮어씁니다.",
       "batch_handling": "일괄 처리",
       "bundle_size": "패키지 크기",
       "bundle_summary": "패키지 요약",
@@ -2472,7 +2476,6 @@
       "folder_name_type": "패키지 내부의 Mod 폴더 이름",
       "folder_name_type_desc": "내보낸 패키지 내의 폴더 이름에만 영향을 미칩니다. 원래 모드 디렉토리는 변경되지 않습니다. 잘못된 파일 이름 문자는 대체되고 중복 항목에는 접미사가 붙습니다.",
       "footer": {
-        "data_import": "동일한 이름의 환경은 귀하의 선택에 따라 처리됩니다. 다른 데이터는 일반적인 가져오기 흐름을 따릅니다.",
         "mod_export": "동일한 모드에 여러 소스가 있는 경우 현재 사용 중인 버전이 선호되며 중복 복사본은 건너뜁니다.",
         "mod_import": "현재 환경이나 관리자 디렉터리로 가져오면 현재 모드 목록이 자동으로 새로 고쳐집니다. 로컬 파일이 누락된 모드는 건너뛰고 보고됩니다."
       },
@@ -2535,6 +2538,9 @@
         "skip": "건너뛰다"
       },
       "rename_placeholder": "새 이름을 자동으로 생성하려면 비워 두세요.",
+      "restore_desc": "기존 환경, 저장 파일과 게임 설정을 유지하면서 백업에서 앱 데이터를 복원합니다.",
+      "restore_title": "소프트웨어 데이터 복원",
+      "restore_warning": "복원 안내: 앱 설정, AI 정의, 사용자 규칙, 사용자 지정 정보, 그룹 및 구독을 백업 당시 상태로 되돌립니다. 이 범위에서 백업에 없는 데이터는 삭제됩니다. 환경, 저장 파일과 게임 설정은 복원하지 않습니다. 새 백업을 생성하지 않으며 기존 백업 파일은 보존됩니다.",
       "select_game_install": "사용 가능한 게임 설치 선택",
       "select_profile_to_overwrite": "덮어쓸 환경 선택",
       "selected_mod_count": "{count} 모드가 선택되었습니다.",
@@ -2544,6 +2550,7 @@
       "size_change": "사이즈 변경",
       "start_export": "내보내기 시작",
       "start_import": "가져오기 시작",
+      "start_restore": "복원 시작",
       "strategy": {
         "create_all": "모두 만들기",
         "overwrite_all": "모두 덮어쓰기",
@@ -4827,6 +4834,7 @@
       },
       "dev": {
         "database_recreated": "로컬 데이터베이스를 찾을 수 없어 다시 생성되었습니다.",
+        "invalid_data_backup": "이 파일은 앱 데이터 백업이 아닙니다. “데이터 패키지 가져오기”로 열어 주세요.",
         "remote_image_cache_cleared": "{count} 캐시된 이미지를 삭제하고 {size}를 해제했습니다.",
         "repair_complete_restart_later": "복구가 완료되었으며 다시 시작한 후에 적용됩니다."
       },
@@ -5279,6 +5287,9 @@
       },
       "data_export": {
         "dependencies": "종속성: {dependencies}"
+      },
+      "dev": {
+        "restore_data_backup": "마지막 가져오기 직전의 앱 데이터를 복원합니다: 앱 설정, AI 정의, 사용자 규칙, 사용자 지정 정보, 그룹 및 구독.\n환경, 저장 파일과 게임 설정은 제외됩니다. 새 백업을 만들지 않고 위 앱 데이터를 덮어씁니다.\n파일: {path}\n크기: {size}\n백업 시간: {time}"
       },
       "external": {
         "git_provider_catalog_sources": "한 줄에 하나의 소스, 형식: 이름|URL. 기본 추천 목록을 사용하려면 비워 두세요.",
@@ -6163,6 +6174,7 @@
         "remote_image_cache": "원격 이미지 캐시",
         "remote_image_cache_desc": "원격 표지 이미지, 스크린샷, 서식 있는 텍스트 이미지는 먼저 로컬 캐시에 기록된 다음 로컬 자산 서비스를 통해 프런트엔드에서 읽습니다.",
         "reset_database_now": "지금 로컬 데이터베이스 재설정",
+        "restore_data_backup": "백업 복원",
         "scope": {
           "profile_active": "현재 프로필의 활성 모드({count})",
           "profile_active_desc": "현재 프로필의 활성 모드만 내보냅니다.",
@@ -6942,6 +6954,14 @@
           "local_audit_log": "로컬 감사 로그",
           "no_logs": "감사 기록 ​​없음"
         },
+        "branch": {
+          "confirm": "{repo}을(를) {branch} 브랜치로 전환하고 다시 배포하시겠습니까? 현재 로컬 모드 폴더의 파일을 덮어씁니다.",
+          "detect": "원격 브랜치 조회",
+          "empty": "이 저장소에는 사용 가능한 브랜치가 없습니다",
+          "label": "브랜치",
+          "missing": "대상 브랜치 또는 커밋을 찾을 수 없습니다. 유효한 브랜치를 조회하여 선택하세요.",
+          "switch": "전환 및 배포"
+        },
         "catalog": {
           "add_git_subscription": "Git 구독으로 추가",
           "add_zip_subscription": "Git 구독으로 추가하고 zip 배포",
@@ -7002,7 +7022,8 @@
           "latest_release": "최신: {version}",
           "meta": "저자: {owner} | 기본 분기: {branch}",
           "release": {
-            "description": "작성자가 게시한 안정적인 패키지를 가져옵니다.",
+            "description": "최신 릴리스를 가져옵니다. 릴리스 압축 파일이 없으면 해당 태그의 소스를 가져옵니다.",
+            "failed": "릴리스 정보를 읽지 못했습니다. 소스 브랜치는 계속 동기화할 수 있습니다.",
             "none": "이 저장소에는 아직 릴리스가 없습니다.",
             "title": "릴리스 빌드 가져오기(Release)"
           },

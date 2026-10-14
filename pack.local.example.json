@@ -12,6 +12,7 @@
   "docs": {
     "output_dir": "docs",
     "command": [],
+    "command_python_executable": "",
     "required": false
   },
   "zip": {

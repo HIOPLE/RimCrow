@@ -713,7 +713,10 @@
       "steam_still_running": "Steam läuft noch. Ich warte darauf, dass es beendet wird."
     },
     "github": {
+      "branch_link_unresolved": "Der Branch in diesem Link ist nicht eindeutig. Ermitteln und wählen Sie einen Branch oder geben Sie seinen Namen ein.",
+      "branch_required": "Ziel-Branch nicht gefunden. Ermitteln und wählen Sie einen gültigen Branch und versuchen Sie es erneut.",
       "deploy_started": "Die Bereitstellungsaufgabe für das Git-Abonnement wurde gestartet",
+      "invalid_url": "Ungültige Git-Repository-Adresse",
       "provider_catalog_failed": "Die Git-Empfehlungsliste konnte nicht abgerufen werden. Überprüfen Sie die Netzwerkverbindung, die Proxy-Einstellungen und die URL der Empfehlungsquelle und versuchen Sie es dann erneut.",
       "readme_fetch_failed": "Die README-Datei für das Git-Repository konnte nicht abgerufen werden. Überprüfen Sie die Netzwerkverbindung, die Repository-URL und den Filialnamen und versuchen Sie es dann erneut.",
       "subscription_removed": "Abonnementdatensatz entfernt",
@@ -2438,6 +2441,7 @@
     "package_transfer": {
       "apply_environment_data": "Wenden Sie auch Umgebungsdaten an",
       "apply_environment_data_desc": "Beim Überschreiben einer vorhandenen Umgebung werden nur deren tatsächliche Daten ersetzt. Name, Beschreibung und Bindungen bleiben unverändert. Neue Umgebungen versuchen, die ursprünglichen Paketinformationen beizubehalten.",
+      "auto_backup_hint": "Vor dem Import werden die App-Daten unter data/backups/all-data-backup.rimcrowdata.zip gesichert. Die vorherige Sicherung wird ersetzt.",
       "batch_handling": "Batch-Handling",
       "bundle_size": "Packungsgröße",
       "bundle_summary": "Paketzusammenfassung",
@@ -2472,7 +2476,6 @@
       "folder_name_type": "Mod-Ordnernamen im Paket",
       "folder_name_type_desc": "Betrifft nur Ordnernamen innerhalb des exportierten Pakets. Ursprüngliche Mod-Verzeichnisse werden nicht geändert. Ungültige Zeichen im Dateinamen werden ersetzt und Duplikate erhalten ein Suffix.",
       "footer": {
-        "data_import": "Umgebungen mit demselben Namen werden entsprechend Ihrer Auswahl behandelt. Andere Daten folgen dem normalen Importfluss.",
         "mod_export": "Wenn derselbe Mod mehrere Quellen hat, wird die aktuell verwendete Version bevorzugt und doppelte Kopien werden übersprungen.",
         "mod_import": "Durch den Import in die aktuelle Umgebung oder das Manager-Verzeichnis wird die aktuelle Mod-Liste automatisch aktualisiert. Mods, denen lokale Dateien fehlen, werden übersprungen und gemeldet."
       },
@@ -2535,6 +2538,9 @@
         "skip": "Überspringen"
       },
       "rename_placeholder": "Lassen Sie das Feld leer, um automatisch einen neuen Namen zu generieren",
+      "restore_desc": "App-Daten aus der Sicherung wiederherstellen; vorhandene Profile, Spielstände und Spieleinstellungen bleiben erhalten.",
+      "restore_title": "Softwaredaten wiederherstellen",
+      "restore_warning": "Hinweise zur Wiederherstellung: App-Einstellungen, KI-Definitionen, Benutzerregeln, eigene Angaben, Gruppen und Abonnements werden auf den gesicherten Stand zurückgesetzt. Daten dieser Kategorien, die in der Sicherung fehlen, werden gelöscht. Profile, Spielstände und Spieleinstellungen werden nicht wiederhergestellt. Es wird keine neue Sicherung erstellt; das ursprüngliche Sicherungsarchiv bleibt erhalten.",
       "select_game_install": "Wählen Sie eine verfügbare Spielinstallation aus",
       "select_profile_to_overwrite": "Wählen Sie die Umgebung zum Überschreiben aus",
       "selected_mod_count": "{count}-Mods ausgewählt.",
@@ -2544,6 +2550,7 @@
       "size_change": "Größenänderung",
       "start_export": "Export starten",
       "start_import": "Import starten",
+      "start_restore": "Wiederherstellung starten",
       "strategy": {
         "create_all": "Erstelle alles",
         "overwrite_all": "Alles überschreiben",
@@ -4827,6 +4834,7 @@
       },
       "dev": {
         "database_recreated": "Die lokale Datenbank wurde nicht gefunden und wurde neu erstellt.",
+        "invalid_data_backup": "Diese Datei ist keine App-Datensicherung. Bitte mit „Datenpaket importieren“ öffnen.",
         "remote_image_cache_cleared": "Zwischengespeicherte {count}-Bilder gelöscht und {size} freigegeben",
         "repair_complete_restart_later": "Die Reparatur ist abgeschlossen und wird nach dem Neustart wirksam."
       },
@@ -5279,6 +5287,9 @@
       },
       "data_export": {
         "dependencies": "Abhängigkeiten: {dependencies}"
+      },
+      "dev": {
+        "restore_data_backup": "App-Daten vor dem letzten Import wiederherstellen: App-Einstellungen, KI-Definitionen, Benutzerregeln, eigene Angaben, Gruppen und Abonnements.\nProfile, Spielstände und Spieleinstellungen sind ausgeschlossen. Die genannten App-Daten werden ersetzt, ohne eine weitere Sicherung zu erstellen.\nDatei: {path}\nGröße: {size}\nSicherungszeit: {time}"
       },
       "external": {
         "git_provider_catalog_sources": "Eine Quelle pro Zeile, Format: Name|URL. Lassen Sie das Feld leer, um die Standardempfehlungsliste zu verwenden.",
@@ -6163,6 +6174,7 @@
         "remote_image_cache": "Remote-Bildcache",
         "remote_image_cache_desc": "Remote-Titelbilder, Screenshots und Rich-Text-Bilder werden zuerst in den lokalen Cache geschrieben und dann vom Frontend über den lokalen Asset-Service gelesen.",
         "reset_database_now": "Setzen Sie die lokale Datenbank jetzt zurück",
+        "restore_data_backup": "Sicherung wiederherstellen",
         "scope": {
           "profile_active": "Aktive Mods im aktuellen Profil ({count})",
           "profile_active_desc": "Exportieren Sie nur aktive Mods im aktuellen Profil.",
@@ -6942,6 +6954,14 @@
           "local_audit_log": "Lokales Audit-Protokoll",
           "no_logs": "Keine Prüfaufzeichnungen"
         },
+        "branch": {
+          "confirm": "{repo} auf {branch} umstellen und neu bereitstellen? Die Dateien im aktuellen lokalen Mod-Ordner werden überschrieben.",
+          "detect": "Remote-Branches ermitteln",
+          "empty": "Dieses Repository hat keine verfügbaren Branches",
+          "label": "Branch",
+          "missing": "Ziel-Branch oder Commit nicht gefunden. Ermitteln und wählen Sie einen gültigen Branch.",
+          "switch": "Wechseln und bereitstellen"
+        },
         "catalog": {
           "add_git_subscription": "Als Git-Abonnement hinzufügen",
           "add_zip_subscription": "Als Git-Abonnement hinzufügen und ZIP bereitstellen",
@@ -7002,7 +7022,8 @@
           "latest_release": "Neueste: {version}",
           "meta": "Autor: {owner} | Standardzweig: {branch}",
           "release": {
-            "description": "Rufen Sie das vom Autor veröffentlichte stabile Paket ab.",
+            "description": "Neueste Veröffentlichung abrufen; ohne Release-Archiv wird der Quellcode des zugehörigen Tags heruntergeladen.",
+            "failed": "Release-Informationen konnten nicht gelesen werden. Der Quellcode-Branch kann weiterhin synchronisiert werden.",
             "none": "Dieses Repository hat noch kein Release",
             "title": "Release-Build abrufen (Release)"
           },

@@ -2686,7 +2686,14 @@ class API:
     def data_bundle_import(self, bundle_path: str, payload: dict | None = None):
         """导入统一软件数据包。"""
         payload = payload or {}
+        maintenance_lock = getattr(self, "_db_maintenance_lock", None)
+        if maintenance_lock and not maintenance_lock.acquire(blocking=False):
+            return ApiResponse.warning(tr("api.database.maintenance_busy", "当前正在处理数据库操作，请稍后再试。"))
         try:
+            if maintenance_lock:
+                ready, reason = self._prepare_database_maintenance()
+                if not ready:
+                    return ApiResponse.warning(reason)
             before_settings = asdict(settings.config)
             module_keys = payload.get("module_keys")
             default_profile_mode = str(payload.get("default_profile_mode") or "clone").strip().lower() or "clone"
@@ -2714,6 +2721,10 @@ class API:
         except Exception as e:
             logger.error("导入数据包失败: bundle_path=%s 错误=%s", bundle_path, e, exc_info=True)
             return ApiResponse.error("导入数据包失败", code="DATA_BUNDLE.IMPORT_FAILED", detail=e, context={"bundle_path": bundle_path}, user_message=tr("api.data_bundle.import_failed", "导入数据包失败。请确认文件完整、格式正确，并检查目标目录权限。"))
+        finally:
+            if maintenance_lock:
+                self._finish_database_maintenance()
+                maintenance_lock.release()
 
     @log_api_call
     def mod_package_get_schema(self):
@@ -8502,6 +8513,14 @@ class API:
         return ApiResponse.success(res)
 
     @log_api_call
+    def github_fetch_branches(self, url: str) -> dict[str, Any]:
+        """按用户操作探测分支，不在普通订阅刷新中扫描全部分支。"""
+        identity = self.github_mgr.parse_git_repo_url(url)
+        if not identity:
+            return ApiResponse.error(tr("api.github.invalid_url", "无效的 Git 仓库链接"))
+        return ApiResponse.success({"repo_url": identity.url, "branches": self.github_mgr.fetch_repo_branches(identity.url)})
+
+    @log_api_call
     def github_get_provider_catalog(self, url: str = "", force_refresh: bool = False):
         """获取 Git 推荐列表"""
         try:
@@ -8520,7 +8539,7 @@ class API:
             return ApiResponse.error("获取 Git 仓库 README 失败", code="GITHUB.README_FETCH_FAILED", detail=e, context={"url": url, "source_branch": source_branch}, user_message=tr("api.github.readme_fetch_failed", "获取 Git 仓库 README 失败。请检查网络连接、仓库地址和分支名称后重试。"))
 
     @log_api_call
-    def github_subscribe(self, payload: dict):
+    def github_subscribe(self, payload: dict[str, Any]) -> dict[str, Any]:
         """添加订阅到数据库"""
         url = payload.get("url")
         if not url: return ApiResponse.error(tr("api.github.url_required", "URL 不能为空"))
@@ -8528,9 +8547,12 @@ class API:
         info = payload.get("info") or {}
         provider, host = self.github_mgr.detect_repo_provider(url)
         install_type = str(payload.get("install_type") or "source").strip() or "source"
-        target_branch = str(payload.get("default_branch") or "").strip()
+        target_branch = str(payload.get("default_branch") or info.get("latest_source_branch") or info.get("default_branch") or "").strip()
         if install_type != "zip":
-            target_branch = target_branch or "main"
+            identity, target_branch = self.github_mgr.resolve_repo_link(url, target_branch)
+            url = identity.url
+            if install_type == "source" and (not target_branch or info.get("source_status") == "missing"):
+                return ApiResponse.error(tr("api.github.branch_required", "未找到目标分支，请探测并选择有效分支后重试。"))
 
         with db.atomic():
             record, created = GithubModRecord.get_or_create(
@@ -8569,7 +8591,9 @@ class API:
             download_version = str(info.get("catalog_signature") or "").strip()
         elif install_type == "release":
             download_version = installed_version or str(info.get("latest_release_tag") or "").strip()
-        self.github_trigger_download(url, install_type, download_version)
+        download_result = self.github_trigger_download(url, install_type, download_version)
+        if download_result.get("status") != "success":
+            return download_result
         return self.github_get_subscribed() # 返回最新列表
 
     @log_api_call

@@ -713,7 +713,10 @@
       "steam_still_running": "Steam 仍在运行，继续等待其退出。"
     },
     "github": {
+      "branch_link_unresolved": "无法确定链接中的分支，请探测并选择分支，或手动填写分支名称。",
+      "branch_required": "未找到目标分支，请探测并选择有效分支后重试。",
       "deploy_started": "Git 订阅部署任务已启动",
+      "invalid_url": "无效的 Git 仓库链接",
       "provider_catalog_failed": "获取 Git 推荐列表失败。请检查网络连接、代理设置和推荐源地址，稍后重试。",
       "readme_fetch_failed": "获取 Git 仓库 README 失败。请检查网络连接、仓库地址和分支名称后重试。",
       "subscription_removed": "已移除订阅记录",
@@ -2438,6 +2441,7 @@
     "package_transfer": {
       "apply_environment_data": "同时应用环境数据",
       "apply_environment_data_desc": "覆盖现有环境时，只会替换这个环境的实际使用数据，不会改名称、说明和绑定关系。新建环境时，会尽量保留原来的环境信息。",
+      "auto_backup_hint": "导入前会自动备份软件数据到 data/backups/all-data-backup.rimcrowdata.zip，每次覆盖上一份备份。",
       "batch_handling": "批量处理",
       "bundle_size": "压缩包大小",
       "bundle_summary": "包摘要",
@@ -2472,7 +2476,6 @@
       "folder_name_type": "包内Mod文件夹命名",
       "folder_name_type_desc": "只影响导出包里的文件夹名称，不会改动原始Mod目录。遇到不适合作为文件名的字符会自动替换，重名会自动追加序号。",
       "footer": {
-        "data_import": "环境重名时会按你的选择处理，其它数据仍按原流程导入。",
         "mod_export": "如果同一个模组有多个来源，会优先带上你当前正在使用的版本，重复副本会自动跳过。",
         "mod_import": "导入到当前环境目录或管理器目录时会自动刷新当前模组列表。缺少本地文件的模组会跳过并提醒你。"
       },
@@ -2535,6 +2538,9 @@
         "skip": "跳过"
       },
       "rename_placeholder": "留空会自动补一个新名字",
+      "restore_desc": "从备份包恢复软件数据，保留现有环境、存档和游戏配置。",
+      "restore_title": "恢复软件数据",
+      "restore_warning": "恢复操作说明：把软件设置、AI 定义、用户规则、自定义信息、分组以及订阅项还原为备份时的状态，同时删除该范围内备份文件里不存在的数据。环境、存档和游戏配置不会被恢复。本次恢复不会生成新的备份，原有备份包将保留。",
       "select_game_install": "请选择一个可用游戏本体",
       "select_profile_to_overwrite": "请选择要覆盖的环境",
       "selected_mod_count": "已选 {count} 个模组。",
@@ -2544,6 +2550,7 @@
       "size_change": "体积变化",
       "start_export": "开始导出",
       "start_import": "开始导入",
+      "start_restore": "开始恢复",
       "strategy": {
         "create_all": "全部新建",
         "overwrite_all": "全部覆盖",
@@ -4827,6 +4834,7 @@
       },
       "dev": {
         "database_recreated": "未找到本地数据库，已重新创建。",
+        "invalid_data_backup": "该文件不是软件数据备份包，请使用“导入数据包”读取。",
         "remote_image_cache_cleared": "已清理 {count} 张缓存图片，释放 {size}",
         "repair_complete_restart_later": "修复已完成，重启软件后生效。"
       },
@@ -5279,6 +5287,9 @@
       },
       "data_export": {
         "dependencies": "依赖：{dependencies}"
+      },
+      "dev": {
+        "restore_data_backup": "恢复上次导入前的软件数据：软件设置、AI 定义、用户规则、自定义信息、分组和订阅。\n不包含环境、存档及游戏配置；恢复会覆盖上述软件数据，不会再次备份。\n文件：{path}\n大小：{size}\n备份时间：{time}"
       },
       "external": {
         "git_provider_catalog_sources": "每行一个来源，格式：名称|URL。留空时使用默认推荐清单。",
@@ -6163,6 +6174,7 @@
         "remote_image_cache": "网络图片缓存",
         "remote_image_cache_desc": "远程封面图、截图和富文本图片会先写入本地缓存，再由前端通过本地资源服务读取。",
         "reset_database_now": "立即重置本地数据库",
+        "restore_data_backup": "恢复备份",
         "scope": {
           "profile_active": "当前环境启用模组（{count}）",
           "profile_active_desc": "只导出当前环境里已经启用的模组。",
@@ -6942,6 +6954,14 @@
           "local_audit_log": "本地执行追踪 (Local Audit Log)",
           "no_logs": "暂无追踪记录"
         },
+        "branch": {
+          "confirm": "将 {repo} 切换到 {branch} 并重新部署，当前本地模组目录中的文件会被覆盖。是否继续？",
+          "detect": "探测远端分支",
+          "empty": "该仓库没有可用分支",
+          "label": "分支",
+          "missing": "未找到目标分支或提交，请探测并选择有效分支。",
+          "switch": "切换并部署"
+        },
         "catalog": {
           "add_git_subscription": "添加为 Git 订阅",
           "add_zip_subscription": "添加为 Git 订阅并部署 zip",
@@ -7002,7 +7022,8 @@
           "latest_release": "最新：{version}",
           "meta": "作者: {owner} | 默认分支: {branch}",
           "release": {
-            "description": "获取作者打包的稳定版。",
+            "description": "获取最新发行版本；没有发行包时获取对应标签的源码。",
+            "failed": "发行版信息读取失败，可继续同步源码分支",
             "none": "该仓库尚未发布任何 Release",
             "title": "获取发行版 (Release)"
           },

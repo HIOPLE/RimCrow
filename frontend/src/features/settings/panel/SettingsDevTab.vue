@@ -46,8 +46,8 @@
                           {{ t('ui.settings.dev.data_migration_desc', '导入现有数据包，或打开导出面板选择要打包的软件数据。环境数据会包含对应环境的完整目录。') }}
                         </p>
                       </div>
-                      <div class="flex items-center gap-2 shrink-0">
-                        <button @click="openDataBundleImportDialog" :disabled="isPending('data-import')" :class="isPending('data-import') ? 'app-action-disabled' : ''"
+                      <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button @click="openDataBundleImportDialog()" :disabled="isPending('data-import')" :class="isPending('data-import') ? 'app-action-disabled' : ''"
                           class="px-3 py-1.5 rounded-lg bg-bg-overlay/5 hover:bg-bg-overlay/10 border border-border-base/10 text-xs font-bold transition-all" >
                           <span class="inline-flex items-center gap-1">
                             <LoaderCircle v-if="isPending('data-import')" class="h-3 w-3 animate-spin" />
@@ -62,6 +62,13 @@
                           </span>
                         </button>
                       </div>
+                    </div>
+                    <div class="flex items-center justify-end">
+                      <button v-if="dataBundleSchema.software_backup" @click="openDataBundleImportDialog(dataBundleSchema.software_backup.path)"
+                        v-tooltip="softwareBackupTooltip" :disabled="!!pendingAction"
+                        class="px-1 py-0.5 rounded-lg bg-accent-warn/10 hover:bg-accent-warn/20 border border-accent-warn/30 text-accent-warn text-xs font-bold transition-all disabled:opacity-50">
+                        {{ t('ui.settings.dev.restore_data_backup', '恢复备份') }}
+                      </button>
                     </div>
                   </div>
                   <div class="p-4 rounded-2xl bg-accent-special/5 border border-accent-special/20">
@@ -153,6 +160,13 @@ const dataBundleSchema = ref({
 })
 const showDataBundleModal = ref(false)
 const pendingAction = ref('')
+const softwareBackupTooltip = computed(() => {
+  const backup = dataBundleSchema.value.software_backup
+  if (!backup) return ''
+  return t('tooltip.settings.dev.restore_data_backup', '恢复上次导入前的软件数据：软件设置、AI 定义、用户规则、自定义信息、分组和订阅。\n不包含环境、存档及游戏配置；恢复会覆盖上述软件数据，不会再次备份。\n文件：{path}\n大小：{size}\n备份时间：{time}', {
+    path: backup.path, size: formatFileSize(backup.size_bytes), time: new Date(backup.modified_at).toLocaleString(),
+  })
+})
 const silentModeViewOptions = computed(() => [
   { label: t('ui.settings.dev.silent_view.home', '静默主页'), value: 'home' },
   { label: t('ui.settings.dev.silent_view.logs', '游戏日志'), value: 'logs' },
@@ -214,7 +228,7 @@ const handleClearRemoteImageCache = async () => {
   toast.success(t('toast.settings.dev.remote_image_cache_cleared', '已清理 {count} 张缓存图片，释放 {size}', { count: clearedCount, size: clearedBytes }))
 }
 
-const openDataBundleImportDialog = async () => {
+const openDataBundleImportDialog = async (backupPath = '') => {
   await runPendingAction('data-import', async () => {
     // 导入前先检查数据包内容，把冲突处理交给统一的迁移面板。
     const schema = await appStore.getDataBundleSchema()
@@ -226,7 +240,7 @@ const openDataBundleImportDialog = async () => {
     ]
       .map(item => String(item || '').trim())
       .filter(Boolean)
-    const bundlePath = await appStore.getFilePath(schema.data_dir || 'data', [
+    const bundlePath = backupPath || await appStore.getFilePath(schema.data_dir || 'data', [
       `RimCrow Data Package (${extensions.map(item => `*${item}`).join(';')})`,
       'All Files (*.*)',
     ])
@@ -234,6 +248,10 @@ const openDataBundleImportDialog = async () => {
 
     const inspectData = await appStore.inspectDataBundle(bundlePath)
     if (!inspectData) return
+    if (backupPath && !inspectData.is_software_backup) {
+      toast.error(t('toast.settings.dev.invalid_data_backup', '该文件不是软件数据备份包，请使用“导入数据包”读取。'))
+      return
+    }
 
     appStore.openPackageTransferDialog('data-import', {
       title: t('ui.settings.dev.import_data_bundle_title', '导入软件数据包'),
@@ -346,11 +364,11 @@ const handleRepair = async () => {
   await appStore.restartApplication()
 }
 
-watch(() => appStore.uiState.showSettingsPanel, async (visible) => {
-  if (visible) {
-    await appStore.refreshRemoteImageCacheStats()
+watch(() => [appStore.uiState.showSettingsPanel, appStore.uiState.showPackageTransferDialog], async ([visible, transferVisible]) => {
+  if (visible && !transferVisible) {
+    await Promise.all([appStore.refreshRemoteImageCacheStats(), loadDataBundleSchema()])
     return
   }
-  closeDataBundleModal()
+  if (!visible) closeDataBundleModal()
 }, { immediate: true })
 </script>

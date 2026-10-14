@@ -41,6 +41,7 @@ DEFAULT_PACK_CONFIG: dict[str, Any] = {
     "docs": {
         "output_dir": "docs",
         "command": [],
+        "command_python_executable": "",
         "required": False,
     },
     "tree": {
@@ -520,13 +521,18 @@ def _count_release_pdfs(output_dir: Path) -> int:
 
 
 def _resolve_docs_command(docs_config: dict[str, Any]) -> list[str]:
+    """执行 Python 脚本时优先使用配置解释器，未配置则沿用当前解释器。"""
     raw_command = docs_config.get("command", [])
     if not raw_command:
         return []
     if not isinstance(raw_command, list):
         print("警告: docs.command 应为命令数组，已跳过发布文档生成。")
         return []
-    return [str(item) for item in raw_command if str(item).strip()]
+    command = [str(item) for item in raw_command if str(item).strip()]
+    if command and Path(command[0]).suffix.lower() == ".py":
+        command_python = str(docs_config.get("command_python_executable", "")).strip() or sys.executable
+        command.insert(0, command_python)
+    return command
 
 
 def build_release_docs(
