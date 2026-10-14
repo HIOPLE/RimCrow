@@ -577,7 +577,7 @@ def _iter_release_docs_files(docs_dir: Path):
         return
     for file_path in docs_dir.rglob("*.pdf"):
         if file_path.is_file():
-            yield file_path, Path("docs") / file_path.relative_to(docs_dir)
+            yield file_path, file_path.relative_to(docs_dir)
 
 
 def create_release_zip(app_name: str, version: str, docs_dir: Path | None = None, include_docs: bool = True):
