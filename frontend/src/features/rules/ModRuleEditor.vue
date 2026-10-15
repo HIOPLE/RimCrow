@@ -338,16 +338,7 @@ const addRuleComm = async (ruleType, otherId, e) => {
 }
 // 从列表拖拽添加用户规则
 const onDrop = async (e, ruleType) => {
-  // 规则列表是小型投放区，不做虚拟排序；这里复用全局选中态支持多选拖入。
-  const sourceId = e.item.id
-  const selectedIds = (modStore.selectedIds || []).map(id => String(id || '').toLowerCase()).filter(Boolean)
-  const sourceIds = selectedIds.includes(String(sourceId || '').toLowerCase()) ? selectedIds : [sourceId]
-  for (const id of sourceIds) {
-    const packageId = normalizePackageId(id)
-    if (!packageId || packageId === targetPackageId.value) continue
-    // 调用 RuleStore 添加规则
-    await ruleStore.addUserModRule(targetPackageId.value, ruleType, packageId)
-  }
+  await ruleStore.addUserModRule(targetPackageId.value, ruleType, e.item.mod_ids?.length ? e.item.mod_ids : [e.item.id])
 }
 
 const persistLanguagePackOwnerOverride = async (ownerIds, replace = languagePackOwnerReplaceEnabled.value) => {
@@ -364,13 +355,10 @@ const toggleLanguagePackOwnerOverrideMode = async (enabled) => {
 }
 
 const onDropLanguagePackOwner = async (e) => {
-  const sourceId = e.item.id
-  const selectedIds = (modStore.selectedIds || []).map(id => String(id || '').toLowerCase()).filter(Boolean)
-  const sourceIds = selectedIds.includes(String(sourceId || '').toLowerCase()) ? selectedIds : [sourceId]
   const nextIds = [...new Set([
     ...languagePackOwnerOverrideRows.value.map(item => item.id),
-    ...sourceIds
-      .map(id => String(id || '').toLowerCase())
+    ...(e.item.mod_ids?.length ? e.item.mod_ids : [e.item.id])
+      .map(id => normalizePackageId(id))
       .filter(id => id && id !== targetMod.value?.package_id)
   ])]
   await persistLanguagePackOwnerOverride(nextIds, languagePackOwnerReplaceEnabled.value)

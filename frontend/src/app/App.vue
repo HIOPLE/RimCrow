@@ -22,11 +22,11 @@
   </div>
 
   <div v-else id="app-shell" class="relative h-screen w-full flex flex-col p-1 overflow-hidden font-sans bg-bg-deep text-text-main select-none">
-    <GlobalFileDrop />
     <RimHeader class="z-500" />
 
     <!-- 主工作区 -->
-    <div class="flex-1 flex flex-col min-h-0 relative">
+    <div id="main-workspace" class="flex-1 flex flex-col min-h-0 relative">
+      <GlobalFileDrop />
       <!-- 容器 -->
       <div ref="containerRef" class="flex flex-1 w-full overflow-hidden relative">
 

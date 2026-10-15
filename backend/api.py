@@ -601,7 +601,7 @@ class API:
             first_db=self.is_first_db_init,
         )
         self._native_drop_bound = False
-        self._native_drop_selector = '#app-shell'
+        self._native_drop_selector = '#main-workspace'
         self._native_drop_element = None
         self._native_drop_handler = None
         self._browser_base_url = ""
@@ -1412,7 +1412,7 @@ class API:
 
     def _normalize_native_drop_selector(self, selector: str | None = None) -> str:
         """把前端传入的 id / selector 统一成 pywebview 可直接查询的 CSS 选择器。"""
-        normalized = str(selector or self._native_drop_selector or '').strip() or '#app-shell'
+        normalized = str(selector or self._native_drop_selector or '').strip() or '#main-workspace'
         if normalized.startswith(('#', '.', '[')): return normalized
         return f'#{normalized}'
 
@@ -1490,7 +1490,7 @@ class API:
             logger.warning(f"处理原生拖放事件失败: {e}")
 
     @log_api_call
-    def bind_global_file_drop_zone(self, selector: str = 'app-shell'):
+    def bind_global_file_drop_zone(self, selector: str = 'main-workspace'):
         """由前端在全局拖放区域挂载后调用，绑定到当前真实存在的 DOM 节点。"""
         normalized_selector = self._normalize_native_drop_selector(selector)
         if self.is_browser_runtime():

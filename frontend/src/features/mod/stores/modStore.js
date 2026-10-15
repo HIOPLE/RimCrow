@@ -637,9 +637,36 @@ export const useModStore = defineStore('mods', () => {
   // 从所有列表中移除指定 IDs
   const removeIdsOnAllList = (ids) => {
     const normalizedIds = buildCanonicalIdSet(normalizeHistoryModIds(ids))
-    activeIds.value = activeIds.value.filter(i => !normalizedIds.has(normalizeCanonicalId(i)))
-    inactiveIds.value = inactiveIds.value.filter(i => !normalizedIds.has(normalizeCanonicalId(i)))
-    tempIds.value = tempIds.value.filter(i => !normalizedIds.has(normalizeCanonicalId(i)))
+    for (const list of [activeIds, inactiveIds, tempIds]) {
+      const next = list.value.filter(id => !normalizedIds.has(normalizeCanonicalId(id)))
+      if (next.length !== list.value.length) list.value = next
+    }
+  }
+  // 拖放和菜单移动一次提交最终顺序，未变化的列表保留原引用。
+  const moveListItems = async ({ ids, targetListId, targetIds, type, label }) => {
+    const lists = { active: activeIds, inactive: inactiveIds, temp: tempIds }
+    const target = lists[targetListId]
+    const movingIds = normalizeHistoryModIds(ids)
+    if (!target || !movingIds.length) return false
+    const movingSet = buildCanonicalIdSet(movingIds)
+    const nextLists = Object.entries(lists).map(([id, list]) => {
+      const next = id === targetListId ? normalizeHistoryModIds(targetIds) : list.value.filter(item => !movingSet.has(normalizeCanonicalId(item)))
+      return { list, next }
+    }).filter(({ list, next }) => next.length !== list.value.length || next.some((id, index) => id !== list.value[index]))
+    if (!nextLists.length) return false
+    const previousActive = buildCanonicalIdSet(activeIds.value)
+    await runListHistoryTransaction({ type, label, trackedModIds: movingIds }, () => {
+      for (const { list, next } of nextLists) list.value = next
+      movingIds.forEach(id => dismissedUnavailableIds.delete(id))
+      const now = Date.now()
+      movingIds.forEach(id => {
+        const mod = resolveStoredMod(id)
+        if (!mod) return
+        mod.last_moved_time = now
+        if (targetListId === 'active' && !previousActive.has(normalizeCanonicalId(mod.package_id))) mod.last_active_time = now
+      })
+    })
+    return true
   }
   // 删除或取订删除成功后只清理前端真实模组数据；是否移除列表项由调用方按具体流程决定。
   const removeDeletedModsFromLocalData = (items) => {
@@ -1759,7 +1786,7 @@ export const useModStore = defineStore('mods', () => {
     isLanguagePackMod, getLanguagePackOwnerIds, canUseLanguagePackForIssueDetection, isDeclaredForCurrentLanguage,
     // 来源提示与列表选择
     getInstallSourceHints, mergeInstallSourceHintsFromMods, clearInstallSourceHints, clearInstallSourceHintsByOrigin,
-    updateInactiveIds, takeInactiveIds, setListIds, removeIdsOnAllList, removeDeletedModsFromLocalData, removeUnavailableIdsCompletely, selectMods, clearSelection, changeModsActive, getModInterlockChain, loadInterlockDetails,
+    updateInactiveIds, takeInactiveIds, setListIds, removeIdsOnAllList, moveListItems, removeDeletedModsFromLocalData, removeUnavailableIdsCompletely, selectMods, clearSelection, changeModsActive, getModInterlockChain, loadInterlockDetails,
     // 扫描、排序与模组操作
     scanMods, scanComplete, autoSortMods, clearPendingSortConflict, retryAutoSortAfterRuleChange, resetActiveList, applyResetActiveListPreset, resolveResetActiveListPreview, resolveLocalizeCandidates, localizeSelectedMods, localizeMods, disableMods, disableSelectedMods, deleteMods, deleteSelectedModFiles, unsubscribeSelectedWorkshopMods, smartInsertMods,
     canSwitchCoexistenceSource, switchCoexistenceSource, toggleCoexistenceSource, toggleSelectedCoexistenceSource, revealSelectedMod,
