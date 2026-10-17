@@ -1,4 +1,4 @@
-import requests
+from typing import Any
 import re
 from packaging import version
 from urllib.parse import urljoin, urlparse
@@ -16,6 +16,7 @@ if __name__ == "__main__":
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
+from backend.managers.mgr_network import build_retry_session
 from backend.utils.tools import get_package_platform_match, get_current_package_platform_keywords, has_supported_update_package_name
 
 class LanzouParser:
@@ -23,9 +24,9 @@ class LanzouParser:
     ACW_ARG_ORDER = [0xf, 0x23, 0x1d, 0x18, 0x21, 0x10, 0x1, 0x26, 0xa, 0x9, 0x13, 0x1f, 0x28, 0x1b, 0x16, 0x17, 0x19, 0xd, 0x6, 0xb, 0x27, 0x12, 0x14, 0x8, 0xe, 0x15, 0x20, 0x1a, 0x2, 0x1e, 0x7, 0x4, 0x11, 0x5, 0x3, 0x1c, 0x22, 0x25, 0xc, 0x24]
     ACW_KEY = "3000176000856006061501533003690027800375"
 
-    def __init__(self):
-        self.session = requests.Session()
-        self.session.trust_env = False  # 禁用环境变量代理
+    def __init__(self, session: Any = None):
+        # 蓝奏云是直连来源，不继承应用或环境代理。
+        self.session = session if session is not None else build_retry_session(route_manager=False, trust_env=False)
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/javascript, */*',

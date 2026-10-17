@@ -32,7 +32,10 @@ class TestGithubApi(unittest.TestCase):
                 "install_type": "source",
             })
 
-        api.github_trigger_download.assert_called_once_with("https://github.com/team/mod", "source", "dev")
+        api.github_trigger_download.assert_called_once_with(
+            "https://github.com/team/mod", "source", "dev",
+            {"ref_type": "branch", "asset_name": "", "source_subpath": ""},
+        )
         self.assertEqual(result["status"], "success")
 
     def test_switch_branch_keeps_installed_version_and_reports_download_start_failure(self):
@@ -46,7 +49,10 @@ class TestGithubApi(unittest.TestCase):
             })
         self.assertEqual(record.target_branch, "feature/1.7")
         self.assertEqual(record.installed_version, "master@old")
-        self.api.github_trigger_download.assert_called_once_with("https://gitgud.io/team/mod", "source", "feature/1.7")
+        self.api.github_trigger_download.assert_called_once_with(
+            "https://gitgud.io/team/mod", "source", "feature/1.7",
+            {"ref_type": "branch", "asset_name": "", "source_subpath": ""},
+        )
         self.assertEqual(result["status"], "error")
         self.api.github_get_subscribed.assert_not_called()
 

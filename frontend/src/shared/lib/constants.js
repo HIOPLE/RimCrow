@@ -6,6 +6,8 @@ import { t } from '../i18n.js'
 
 export const RIMWORLD_STEAM_APP_ID = 294100
 
+export const UI_Z_INDEX = Object.freeze({ SECONDARY_MODAL: 120 })
+
 /**
  * 辅助函数：将 SVG 路径转换为 Vue 渲染函数组件
  * @param {string} colorClass Tailwind 颜色类名

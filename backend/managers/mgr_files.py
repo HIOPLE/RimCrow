@@ -19,7 +19,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import webview # 引入 webview 库
 from webview.util import parse_file_type
 from backend.managers.mgr_game import GameManager
-from backend.managers.mgr_network import build_retry_session, merge_headers, network_mgr
+from backend.managers.mgr_network import build_retry_session, merge_headers
 from backend.paths.game_locations import normalize_steam_root, resolve_steam_executable_path, resolve_steamcmd_executable_path
 from backend.paths.rimworld_layout import normalize_rimworld_install_root
 from backend.i18n.messages import localized_key, localized_params, tr
@@ -305,10 +305,6 @@ class LocalAssetHandler(SimpleHTTPRequestHandler):
                         "timeout": (5, 12),
                         "stream": True,
                     }
-                    proxy_url = network_mgr.get_proxy_url()
-                    if proxy_url:
-                        request_kwargs["proxies"] = {"http": proxy_url, "https": proxy_url}
-
                     response = session.get(remote_url, **request_kwargs)
                     if response.status_code != 200:
                         logger.debug(f"远程图片下载失败，状态码 {response.status_code}：{remote_url}")

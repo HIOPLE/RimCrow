@@ -11,10 +11,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+import requests
+
 from backend.settings import settings
 from backend.managers.mgr_github import GithubManager
 from backend.managers.mgr_network import build_retry_session, merge_headers
 from backend.utils.logger import logger
+from backend.utils.tools import validate_zip_archive
 
 
 MULTIPLAYER_PACKAGE_ID = "rwmt.multiplayer"
@@ -250,10 +253,32 @@ class MultiplayerCompatibilityManager:
 
     @staticmethod
     def _download_source_archive(url: str) -> tuple[bytes, dict[str, Any], str]:
+        parsed = urlparse(str(url or "").strip())
+        is_github_archive = (parsed.hostname or "").lower() in {"github.com", "www.github.com", "codeload.github.com"}
+        candidates = GithubManager._github_download_candidates(url, "archive") if is_github_archive else [url]
+        last_error: Exception | None = None
         with build_retry_session() as session:
-            with session.get(url, timeout=(15, 120), headers=merge_headers({"Accept-Encoding": "identity"}), allow_redirects=True) as response:
-                response.raise_for_status()
-                return response.content, dict(response.headers), str(response.url or url)
+            for candidate in candidates:
+                response = None
+                try:
+                    response = session.get(candidate, timeout=(15, 120), headers=merge_headers({"Accept-Encoding": "identity"}), allow_redirects=True)
+                    response.raise_for_status()
+                    content = response.content
+                    # 镜像可能返回 HTML 登录页但仍是 200；先校验 ZIP，才能继续尝试直链。
+                    validate_zip_archive(io.BytesIO(content))
+                    if candidate != url:
+                        GithubManager.record_mirror_result(candidate, success=True, capability="archive")
+                    return content, dict(response.headers), str(response.url or candidate)
+                except (requests.RequestException, ValueError, zipfile.BadZipFile) as exc:
+                    last_error = exc
+                    if candidate != url:
+                        GithubManager.record_mirror_result(candidate, success=False, capability="archive")
+                finally:
+                    if response is not None:
+                        response.close()
+        if last_error:
+            raise last_error
+        raise ValueError("源码压缩包没有可用的下载地址")
 
     @staticmethod
     def _parse_http_datetime_to_ms(value: Any) -> int:

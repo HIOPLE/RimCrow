@@ -3,10 +3,12 @@ from __future__ import annotations
 import httpx
 import pytest
 import requests
+import ssl
 
 from backend.api import ApiResponse
 from backend.i18n.messages import tr
-from backend.utils.error_contract import classify_exception
+from backend.managers.mgr_steam_api import SteamWebAPI
+from backend.utils.error_contract import InvalidResponseError, classify_exception
 from backend.utils.event_bus import EventBus
 
 
@@ -75,6 +77,9 @@ def test_event_bus_transmits_structured_error_payload(monkeypatch):
             "AI.AUTH_FAILED",
         ),
         (requests.Timeout("timed out"), "NETWORK", "NETWORK.TIMEOUT"),
+        (InvalidResponseError("checksum mismatch"), "NETWORK", "NETWORK.INVALID_RESPONSE"),
+        (requests.exceptions.ChunkedEncodingError("truncated"), "NETWORK", "NETWORK.INVALID_RESPONSE"),
+        (requests.exceptions.ContentDecodingError("invalid encoding"), "NETWORK", "NETWORK.INVALID_RESPONSE"),
         (PermissionError("denied"), "SYSTEM", "SYSTEM.PERMISSION"),
     ],
 )
@@ -130,3 +135,52 @@ def test_classify_exception_maps_ai_text_only_inside_ai_domain(error_text, expec
     assert ai_result.error_type == "AI"
     assert ai_result.error_code == expected_code
     assert non_ai_result.error_code == "SYSTEM.UNKNOWN"
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_code"),
+    [(400, "REQUEST_INVALID"), (401, "AUTH_FAILED"), (403, "ACCESS_DENIED"),
+     (404, "NOT_FOUND"), (407, "PROXY_AUTH"), (408, "TIMEOUT"), (429, "RATE_LIMIT"),
+     (422, "REQUEST_FAILED"), (451, "REQUEST_FAILED"), (502, "SERVICE_UNAVAILABLE")],
+)
+def test_http_errors_use_shared_codes(status, expected_code):
+    response = requests.Response()
+    response.status_code = status
+    response.url = "https://example.test/"
+    with pytest.raises(requests.HTTPError) as captured:
+        response.raise_for_status()
+    result = classify_exception(captured.value)
+    assert result.error_code == f"NETWORK.{expected_code}"
+    assert result.user_message
+    assert result.message_key.startswith("errors.network.")
+
+
+@pytest.mark.parametrize("method", ["_request_json", "_request_text"])
+@pytest.mark.parametrize("status", [403, 429, 503])
+def test_steam_requests_preserve_status_for_shared_classification(monkeypatch, method, status):
+    from unittest.mock import MagicMock
+
+    response = requests.Response()
+    response.status_code = status
+    response.url = "https://api.steampowered.com/test"
+    session = MagicMock()
+    session.__enter__.return_value.request.return_value = response
+    monkeypatch.setattr("backend.managers.mgr_steam_api.build_retry_session", lambda **kwargs: session)
+    with pytest.raises(requests.HTTPError) as captured:
+        getattr(SteamWebAPI, method)("GET", response.url)
+    assert captured.value.response is response
+    result = classify_exception(captured.value)
+    assert result.error_code == {403: "NETWORK.ACCESS_DENIED", 429: "NETWORK.RATE_LIMIT", 503: "NETWORK.SERVICE_UNAVAILABLE"}[status]
+    if status == 403:
+        assert "API Key" in result.user_message
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected_code"),
+    [(requests.exceptions.SSLError("certificate verify failed"), "NETWORK.TLS"),
+     (ssl.SSLError(1, "handshake failed"), "NETWORK.TLS"),
+     (requests.exceptions.ProxyError("proxy failed"), "NETWORK.PROXY"),
+     (__import__("openai").APITimeoutError(request=httpx.Request("GET", "https://example.test")), "NETWORK.TIMEOUT")],
+)
+def test_transport_errors_keep_precise_shared_codes(exc, expected_code):
+    assert classify_exception(exc).error_code == expected_code

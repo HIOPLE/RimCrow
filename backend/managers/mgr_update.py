@@ -19,10 +19,12 @@ from backend.settings import BASE_RESOURCE_DIR, HOME_DIR, settings, UPDATE_DIR, 
 from backend.managers.mgr_download import DownloadManager, DownloadTask
 from backend.managers.mgr_github import GithubApiError, GithubManager
 from backend.utils.event_bus import EventBus
-from backend.utils.tools import get_current_package_platform_keywords, get_package_platform_match, has_supported_update_package_name
+from backend.utils.error_contract import classify_exception
+from backend.utils.tools import get_current_package_platform_keywords, get_package_platform_match, has_supported_update_package_name, validate_zip_archive
 
 # 确保缓存目录存在
 os.makedirs(UPDATE_DIR, exist_ok=True)
+
 
 def _build_env_cleanup_commands() -> str:
     """生成批处理中用于清理/重置运行时环境变量的命令。"""
@@ -42,6 +44,10 @@ class UpdateInfo:
     file_hash: Optional[str] = None      # MD5/SHA256
     hash_algorithm: str = "md5"
     publish_time: Optional[str] = None
+    # managed 使用应用路由；direct 不注入应用或环境代理（仅蓝奏云）。
+    network_mode: str = "managed"
+    # 同一业务源的候选地址由下载器在一次任务内顺序尝试，不再伪装成多个更新源。
+    fallback_urls: Optional[List[str]] = None
     
     # 本地状态控制
     # 'remote': 仅远程存在，需下载
@@ -166,10 +172,12 @@ class LanzouSource(UpdateSource):
                 file_size=latest.get('size'),
                 publish_time=latest.get('time'),
                 # 蓝奏云通常不直接提供 hash，除非写在文件名或备注里
-                file_hash=None, 
-                local_status="remote"
+                file_hash=None,
+                local_status="remote",
+                network_mode="direct",
             )
         return None
+
 
 # --- GitHub 源实现 (预留) ---
 class GithubSource(UpdateSource):
@@ -193,18 +201,22 @@ class GithubSource(UpdateSource):
                 return None
 
             hash_algorithm, file_hash = self._parse_asset_digest(asset.get("digest"))
-            return UpdateInfo(
+            download_url = str(asset.get("browser_download_url") or "")
+            candidates = self.github_mgr._github_download_candidates(download_url, "release_asset")
+            primary = UpdateInfo(
                 has_update=True,
                 version=remote_v,
                 changelog=str(release.get("body") or "无更新日志"),
-                download_url=str(asset.get("browser_download_url") or ""),
+                download_url=candidates[0] if candidates else download_url,
                 source_name="GitHub",
                 file_size=self._format_size(asset.get("size")),
                 file_hash=file_hash,
                 hash_algorithm=hash_algorithm,
                 publish_time=str(release.get("published_at") or release.get("created_at") or ""),
                 local_status="remote",
+                fallback_urls=candidates[1:],
             )
+            return primary
         except (GithubApiError, requests.RequestException) as e:
             raise UpdateSourceError(f"GitHub 更新源请求失败: {e}") from e
         except Exception as e:
@@ -390,8 +402,12 @@ class UpdateManager:
                     remote_success_count += 1
             except Exception as e:
                 logger.error(f"检查更新源失败: source={src.__class__.__name__}, error={e}")
-                error_message = tr("errors.update.source_check_failed", "检查更新源失败。请检查网络连接、代理设置或稍后重试。")
-                source_results.append({"source_name": source_name, "status": "failed", "error": str(error_message), "error_code": "UPDATE.SOURCE_CHECK_FAILED", "message_key": error_message.message_key, "message_params": error_message.message_params})
+                classified = classify_exception(e, module="update", action="source_check")
+                error_message = classified.user_message or tr("errors.update.source_check_failed", "检查更新源失败。请检查网络连接、代理设置或稍后重试。")
+                source_results.append({"source_name": source_name, "status": "failed", "error": str(error_message),
+                    "error_code": classified.error_code if classified.user_message else "UPDATE.SOURCE_CHECK_FAILED",
+                    "message_key": classified.message_key or error_message.message_key,
+                    "message_params": classified.message_params if classified.user_message else error_message.message_params})
                 if is_remote_source:
                     remote_failure_count += 1
                 continue
@@ -423,6 +439,8 @@ class UpdateManager:
                     file_hash=latest_sources[0].file_hash,
                     hash_algorithm=latest_sources[0].hash_algorithm,
                     publish_time=latest_sources[0].publish_time,
+                    fallback_urls=latest_sources[0].fallback_urls,
+                    network_mode=latest_sources[0].network_mode,
                     local_status="ready",
                     local_file_path=cached_path,
                 )
@@ -504,7 +522,6 @@ class UpdateManager:
         if source_key not in attempted_keys:
             attempted_keys.append(source_key)
         has_fallback_source = self._next_fallback_source(attempted_keys, sources, info.version) is not None
-
         task_id = self.download_mgr.add_task(
             url=info.download_url,
             dest_dir=str(UPDATE_DIR),
@@ -515,6 +532,12 @@ class UpdateManager:
             on_error=self._on_download_error,
             task_type="update",
             title="软件更新",
+            fallback_urls=info.fallback_urls,
+            validate_download=validate_zip_archive,
+            on_source_result=(lambda url, success: GithubManager.record_mirror_result(
+                url, success=success, capability="release_asset"
+            )) if info.source_name == "GitHub" else None,
+            network_mode=info.network_mode,
             metadata={
                 "version": info.version,
                 "source_name": info.source_name,
@@ -694,6 +717,8 @@ class UpdateManager:
             file_hash=source.get("file_hash"),
             hash_algorithm=str(source.get("hash_algorithm") or "md5"),
             publish_time=source.get("publish_time"),
+            network_mode=str(source.get("network_mode") or "managed"),
+            fallback_urls=[str(url) for url in source.get("fallback_urls") or [] if str(url).strip()],
             local_status=str(source.get("local_status") or "remote"),
             local_file_path=source.get("local_file_path"),
             sources=sources,

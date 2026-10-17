@@ -2,10 +2,13 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+import requests
 
 from backend.managers.mgr_download import DownloadTask
-from backend.managers.mgr_update import GithubSource, LanzouSource, LocalSource, UpdateInfo, UpdateManager, UpdateSourceError, _build_configured_update_sources
+from backend.managers.mgr_update import GiteeSource, GithubSource, LanzouSource, LocalSource, ManifestSource, SourceForgeSource, UpdateInfo, UpdateManager, UpdateSourceError, _build_configured_update_sources
+from backend.settings import settings
 from backend.utils.lanzou_parser import LanzouParser
 
 
@@ -32,6 +35,28 @@ class StubDownloadManager:
 
 
 class TestGithubUpdateSource(unittest.TestCase):
+    def test_check_routes_release_asset_through_selected_mirror_with_direct_fallback(self):
+        source = GithubSource("Inky-Feather/RimCrow")
+        release = {
+            "tag_name": "v0.22.7",
+            "draft": False,
+            "prerelease": False,
+            "assets": [{
+                "name": "RimCrow-v0.22.7-windows.zip",
+                "browser_download_url": "https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip",
+                "digest": "sha256:" + "a" * 64,
+            }],
+        }
+        with patch("backend.managers.mgr_update.__version__", "0.22.6"), \
+             patch("backend.utils.tools.platform.system", return_value="Windows"), \
+             patch.object(source.github_mgr, "fetch_release", return_value=release), \
+             patch.object(settings.config, "github_mirror_id", "custom:custom"), \
+             patch.object(settings.config, "github_mirrors", [{"id": "custom", "url_template": "https://mirror.example/{url}", "support": {"release_asset": {"status": "supported"}}}]):
+            info = source.check()
+
+        self.assertEqual(info.download_url, "https://mirror.example/https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip")
+        self.assertEqual(info.fallback_urls, ["https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip"])
+
     def test_check_returns_github_release_asset_update(self):
         source = GithubSource("Inky-Feather/RimCrow")
         releases = [
@@ -66,6 +91,107 @@ class TestGithubUpdateSource(unittest.TestCase):
         self.assertEqual(info.file_hash, "abc123")
         self.assertEqual(info.hash_algorithm, "sha256")
         self.assertEqual(info.file_size, "64.1 MB")
+
+    def test_download_uses_github_candidates_in_one_task(self):
+        source = GithubSource("Inky-Feather/RimCrow")
+        release = {
+            "tag_name": "v0.22.7",
+            "draft": False,
+            "prerelease": False,
+            "assets": [{
+                "name": "RimCrow-v0.22.7-windows.zip",
+                "browser_download_url": "https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip",
+            }],
+        }
+        manager = UpdateManager()
+        manager.sources = [source]
+        manager.download_mgr = StubDownloadManager()
+        with patch("backend.managers.mgr_update.__version__", "0.22.6"), \
+             patch("backend.utils.tools.platform.system", return_value="Windows"), \
+             patch.object(source.github_mgr, "fetch_release", return_value=release), \
+             patch.object(settings.config, "github_mirror_id", "custom:custom"), \
+             patch.object(settings.config, "github_mirrors", [{"id": "custom", "url_template": "https://mirror.example/{url}", "support": {"release_asset": {"status": "supported"}}}]):
+            info = manager.check_all()
+            manager.perform_update_download()
+
+        task = manager.download_mgr.tasks[0]
+        self.assertEqual(task["url"], info.download_url)
+        self.assertEqual(task["fallback_urls"], info.fallback_urls)
+        with patch("backend.managers.mgr_update.GithubManager.record_mirror_result") as record_result:
+            task["on_source_result"](info.download_url, False)
+        record_result.assert_called_once_with(info.download_url, success=False, capability="release_asset")
+
+    def test_gitee_update_does_not_record_github_mirror_health(self):
+        manager = UpdateManager()
+        manager.download_mgr = StubDownloadManager()
+        info = UpdateInfo(True, "0.22.7", "Gitee update", "https://gitee.com/app.zip", "Gitee")
+        manager._start_update_download(info, [])
+
+        callback = manager.download_mgr.tasks[0]["on_source_result"]
+        self.assertIsNone(callback)
+
+
+class TestAdditionalUpdateSources(unittest.TestCase):
+    def test_sourceforge_source_parses_latest_download_redirect(self):
+        response = Mock()
+        response.headers = {"Content-Length": "74733041", "Content-Disposition": 'attachment; filename="RimCrow-v0.24.12-windows.zip"'}
+        response.url = "https://twds.dl.sourceforge.net/project/rimcrow/v0.24.12/RimCrow-v0.24.12-windows.zip"
+        response.history = []
+        with patch("backend.managers.mgr_update.__version__", "0.24.11"), patch("backend.managers.mgr_update.build_retry_session") as build:
+            session = build.return_value.__enter__.return_value
+            session.get.return_value = response
+            info = SourceForgeSource("https://sourceforge.net/projects/rimcrow").check()
+
+        session.get.assert_called_once()
+        self.assertEqual(session.get.call_args.args[0], "https://sourceforge.net/projects/rimcrow/files/latest/download?format=json")
+        self.assertEqual(info.version, "0.24.12")
+        self.assertEqual(info.download_url, "https://sourceforge.net/projects/rimcrow/files/latest/download?format=json")
+        self.assertEqual(info.file_size, "71.3 MB")
+        response.close.assert_called_once()
+
+    def test_gitee_source_treats_missing_release_as_no_update(self):
+        response = Mock(status_code=404)
+        with patch("backend.managers.mgr_update.build_retry_session") as build:
+            build.return_value.__enter__.return_value.get.return_value = response
+            info = GiteeSource("InkyXFeather/RimCrow").check()
+        self.assertIsNone(info)
+
+    def test_gitee_source_accepts_download_url_and_sha256_fields(self):
+        source = GiteeSource("InkyXFeather/RimCrow")
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "tag_name": "v0.24.13",
+            "draft": False,
+            "prerelease": False,
+            "assets": [{
+                "name": "RimCrow-v0.24.13-windows.zip",
+                "download_url": "https://gitee.com/InkyXFeather/RimCrow/releases/download/v0.24.13/app.zip",
+                "size": 123,
+                "sha256": "a" * 64,
+            }],
+        }
+        response.raise_for_status.return_value = None
+        with patch("backend.managers.mgr_update.__version__", "0.24.12"), \
+            patch("backend.managers.mgr_update.build_retry_session") as build, \
+            patch("backend.utils.tools.platform.system", return_value="Windows"):
+            build.return_value.__enter__.return_value.get.return_value = response
+            info = source.check()
+
+        self.assertIsNotNone(info)
+        self.assertEqual(info.download_url, "https://gitee.com/InkyXFeather/RimCrow/releases/download/v0.24.13/app.zip")
+        self.assertEqual(info.hash_algorithm, "sha256")
+        self.assertEqual(info.file_hash, "a" * 64)
+
+    def test_configured_update_sources_include_sourceforge_and_gitee(self):
+        sources = _build_configured_update_sources({
+            "project": {"github_repo": "Inky-Feather/RimCrow"},
+            "update": {"sources": [
+                {"type": "sourceforge", "url": "https://sourceforge.net/projects/rimcrow"},
+                {"type": "gitee", "repo": "InkyXFeather/RimCrow"},
+            ]},
+        })
+        self.assertIsInstance(sources[1], SourceForgeSource)
+        self.assertIsInstance(sources[2], GiteeSource)
 
     def test_check_ignores_same_version_release(self):
         source = GithubSource("Inky-Feather/RimCrow")
@@ -204,6 +330,8 @@ class TestLanzouUpdatePackageNames(unittest.TestCase):
 
     def test_get_file_retries_acw_challenge_and_returns_https_url(self):
         class FakeResponse:
+            close = Mock()
+
             def __init__(self, text="", payload=None, status_code=200, headers=None):
                 self.text = text
                 self._payload = payload or {}
@@ -247,6 +375,46 @@ class TestLanzouUpdatePackageNames(unittest.TestCase):
         info = parser.get_file("https://wwbns.lanzouu.com/iabc")
 
         self.assertEqual(parser.session.cookies.values["acw_sc__v2"], "6a4279dcdc74c4d9b0ed0b4908616fa7aa7b6b72")
+        self.assertEqual(info["download_url"], "https://zip.example.com/file/path.zip")
+
+    def test_get_file_uses_declared_iframe_ajax_endpoint(self):
+        class FakeResponse:
+            status_code = 200
+            headers = {}
+            close = Mock()
+
+            def __init__(self, text="", payload=None):
+                self.text = text
+                self.payload = payload or {}
+
+            def json(self):
+                return self.payload
+
+        class FakeSession:
+            def __init__(self):
+                self.cookies = Mock()
+                self.post_url = ""
+
+            def get(self, url, **kwargs):
+                if url.endswith("/item"):
+                    return FakeResponse('<span class="p7">文件描述：</span><br>动态接口</td><script>var fid = 321;</script><iframe src="/download/frame?id=1"></iframe>')
+                if url.endswith("/download/frame?id=1"):
+                    return FakeResponse("var sign = 's'; var key = 'k'; $.ajax({url: 'https://apifile.woozooo.com/ajaxfile.php', data: {action: 'downprocess', sign: sign, websignkey: key, kd: 1}})")
+                if url == "https://zip.example.com/file/path.zip":
+                    return FakeResponse()
+                raise AssertionError(url)
+
+            def post(self, url, **kwargs):
+                self.post_url = url
+                self.payload = kwargs["data"]
+                return FakeResponse(payload={"zt": 1, "dom": "zip.example.com", "url": "path.zip"})
+
+        parser = LanzouParser()
+        parser.session = FakeSession()
+        info = parser.get_file("https://wwbns.lanzouu.com/item")
+
+        self.assertEqual(parser.session.post_url, "https://apifile.woozooo.com/ajaxfile.php")
+        self.assertEqual(parser.session.payload["websignkey"], "k")
         self.assertEqual(info["download_url"], "https://zip.example.com/file/path.zip")
 
 
@@ -334,6 +502,20 @@ class TestUpdateManagerSources(unittest.TestCase):
         self.assertEqual(info.check_status, "partial")
         self.assertEqual([result["status"] for result in info.source_results], ["no_update", "failed"])
 
+    def test_check_all_uses_shared_error_for_wrapped_source_timeout(self):
+        manager = self._manager_with_sources([None])
+        source = Mock()
+        manager.sources.append(source)
+        try:
+            raise UpdateSourceError("更新清单请求失败") from requests.Timeout("slow")
+        except UpdateSourceError as exc:
+            source.check.side_effect = exc
+        info = manager.check_all()
+        result = info.source_results[1]
+        self.assertEqual(result["error_code"], "NETWORK.TIMEOUT")
+        self.assertEqual(result["message_key"], "errors.network.timeout")
+        self.assertIn("超时", result["error"])
+
     def test_repeated_download_returns_active_task(self):
         manager = self._manager_with_sources([])
         manager.current_update_info = UpdateInfo(True, "0.22.7", "更新", "https://example.invalid/lanzou.zip", "蓝奏云")
@@ -415,6 +597,74 @@ class TestConfiguredUpdateSources(unittest.TestCase):
         self.assertIsInstance(sources[0], LocalSource)
         self.assertIsInstance(sources[1], LanzouSource)
         self.assertIsInstance(sources[2], GithubSource)
+
+    def test_manifest_source_expands_same_file_mirrors(self):
+        payload = {
+            "schema_version": 1,
+            "product": "RimCrow",
+            "version": "99.0.0",
+            "changelog": "清单更新",
+            "assets": [{
+                "platform": "windows-x64",
+                "size": 2048,
+                "sha256": "a" * 64,
+                "mirrors": [
+                    {"id": "r2", "label": "R2", "url": "https://r2.example/update.zip"},
+                    {"id": "sourceforge", "label": "SourceForge", "url": "https://sf.example/update.zip"},
+                ],
+            }],
+        }
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = payload
+        with patch("backend.managers.mgr_update.build_retry_session") as build:
+            build.return_value.__enter__.return_value.get.return_value = response
+            info = ManifestSource("https://example.invalid/stable.json", "r2", "R2 清单").check()
+
+        self.assertIsNotNone(info)
+        self.assertEqual(info.source_name, "R2")
+        self.assertEqual(info.file_hash, "a" * 64)
+        self.assertEqual([item["source_name"] for item in info.sources], ["R2", "SourceForge"])
+
+    def test_manifest_source_rejects_missing_download_mirrors(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"product": "RimCrow", "version": "99.0.0", "assets": [{"platform": "windows-x64", "mirrors": []}]}
+        with patch("backend.managers.mgr_update.build_retry_session") as build:
+            build.return_value.__enter__.return_value.get.return_value = response
+            with self.assertRaises(UpdateSourceError):
+                ManifestSource("https://example.invalid/stable.json").check()
+
+    def test_manifest_source_requires_schema_and_sha256(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "product": "RimCrow", "version": "99.0.0",
+            "assets": [{"platform": "windows-x64", "mirrors": [{"url": "https://example.invalid/update.zip"}]}],
+        }
+        with patch("backend.managers.mgr_update.build_retry_session") as build:
+            build.return_value.__enter__.return_value.get.return_value = response
+            with self.assertRaisesRegex(UpdateSourceError, "schema_version"):
+                ManifestSource("https://example.invalid/stable.json").check()
+
+    def test_manifest_source_reports_html_response(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.side_effect = ValueError("not json")
+        with patch("backend.managers.mgr_update.build_retry_session") as build:
+            build.return_value.__enter__.return_value.get.return_value = response
+            with self.assertRaisesRegex(UpdateSourceError, "HTML"):
+                ManifestSource("https://example.invalid/stable.json").check()
+
+    def test_build_configured_update_sources_accepts_manifest(self):
+        sources = _build_configured_update_sources({
+            "update": {"sources": [{"type": "manifest", "id": "r2", "label": "R2", "url": "https://example.invalid/stable.json"}]}
+        })
+
+        self.assertEqual(len(sources), 2)
+        self.assertIsInstance(sources[0], LocalSource)
+        self.assertIsInstance(sources[1], ManifestSource)
+        self.assertEqual(sources[1].source_id, "r2")
 
 
 if __name__ == "__main__":

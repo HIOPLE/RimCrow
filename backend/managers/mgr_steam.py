@@ -1440,10 +1440,7 @@ class SteamManager:
             current_env.update(network_mgr.get_proxy_env())
             logger.info("SteamCMD 将使用代理运行。")
         else:
-            current_env.pop("HTTP_PROXY", None)
-            current_env.pop("HTTPS_PROXY", None)
-            current_env.pop("ALL_PROXY", None)
-            logger.info("SteamCMD 将不使用代理运行。")
+            logger.info("SteamCMD 不注入应用代理，沿用外部环境代理设置。")
         return current_env
 
     def _run_steamcmd_workshop_repair_process(self, mod_ids: list[str], task_id: str, on_success=None):

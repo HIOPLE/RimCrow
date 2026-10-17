@@ -767,6 +767,29 @@ class TestWorkshopSearch(unittest.TestCase):
         self.assertIn("ISteamRemoteStorage/GetPublishedFileDetails", captured["url"])
         self.assertEqual(result["1111111111"]["title"], "Legacy Alpha")
 
+    def test_empty_service_search_omits_repeated_list(self):
+        payload = {"response": {"total": 0, "next_cursor": "*"}}
+        with (
+            patch.object(SteamWebAPI, "_get_steam_web_api_key", return_value="test-key"),
+            patch.object(SteamWebAPI, "_request_json", return_value=payload),
+            patch.object(SteamWebAPI, "_request_published_file_service", return_value=payload),
+        ):
+            dependent = SteamWebAPI.search_workshop_dependents_enhanced("1111111111")
+            authored = SteamWebAPI.get_user_files("76561198000000001")
+        for result in (dependent, authored):
+            self.assertEqual(result["items"], [])
+            self.assertEqual(result["total"], 0)
+
+    def test_empty_search_does_not_hide_malformed_or_failed_responses(self):
+        for response in ({}, {"total": 1}, {"total": 0, "publishedfiledetails": {}}, {"total": 0, "result": 8}):
+            with (
+                self.subTest(response=response),
+                patch.object(SteamWebAPI, "_get_steam_web_api_key", return_value="test-key"),
+                patch.object(SteamWebAPI, "_request_json", return_value={"response": response}),
+            ):
+                with self.assertRaises(RuntimeError):
+                    SteamWebAPI.search_workshop_dependents_enhanced("1111111111")
+
     def test_online_search_rejects_malformed_response(self):
         with (
             patch.object(SteamWebAPI, "_get_steam_web_api_key", return_value="test-key"),

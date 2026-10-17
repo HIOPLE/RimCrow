@@ -759,9 +759,33 @@ class API:
 
     def _settings_payload(self) -> dict[str, Any]:
         payload = settings.to_public_dict()
+        network_payload = payload.get("network")
+        if isinstance(network_payload, dict):
+            # 运行时映射只用于只读展示，不写回配置文件。
+            network_payload["effective_hosts"] = network_mgr.get_effective_hosts()
         if payload.get("_secret_storage_warning_key") == "toast.settings.secret_storage_warning":
             payload["_secret_storage_warning"] = str(tr("toast.settings.secret_storage_warning", "部分密钥暂时无法写入本机安全存储，已临时保留在配置文件中。请检查系统凭据服务后重新保存密钥。"))
         return payload
+
+    @log_api_call
+    def network_refresh_github_hosts(self, network_override: dict | None = None):
+        """后台获取表单中的动态 Hosts 来源，不保存设置；关闭表单开关时取消待提交结果。"""
+        return ApiResponse.success(network_mgr.refresh_github_hosts(network_override))
+
+    @log_api_call
+    def network_github_hosts_status(self):
+        """读取任务进度和当前映射，不等待网络请求。"""
+        return ApiResponse.success(network_mgr.get_github_hosts_status())
+
+    @log_api_call
+    def network_check_access(self, settings_override: dict | None = None):
+        """检测常用网络服务；传入设置页表单值时只临时用于本次检测，不保存。"""
+        override = dict(settings_override) if isinstance(settings_override, dict) else {}
+        plan_only = bool(override.pop("_network_check_plan_only", False))
+        target_ids = override.pop("_network_check_target_ids", None)
+        if not isinstance(target_ids, list):
+            target_ids = None
+        return ApiResponse.success(network_mgr.check_network_access(override, target_ids=target_ids, plan_only=plan_only))
 
     def _localized_settings_warning(self, warning: Any) -> Any:
         text = str(warning or "").strip()
@@ -5610,8 +5634,16 @@ class API:
             # 默认下载到应用目录下的 Downloads
             target_dir = str(HOME_DIR / 'Downloads')
             os.makedirs(target_dir, exist_ok=True)
-            
-        task_id = self.download_mgr.add_task(url, target_dir, filename)
+
+        candidates = self.github_mgr._github_download_candidates(url)
+        if not candidates:
+            return ApiResponse.error(tr("errors.network.request_invalid", "请求参数无效。请检查输入内容或配置后重试。"))
+        capability = self.github_mgr.github_url_capability(url) or "raw"
+        url, *fallback_urls = candidates
+        task_id = self.download_mgr.add_task(
+            url, target_dir, filename, fallback_urls=fallback_urls,
+            on_source_result=lambda source, success: self.github_mgr.record_mirror_result(source, success=success, capability=capability),
+        )
         return ApiResponse.success({"task_id": task_id}, tr("api.download.task_added", "下载任务已添加"))
 
     @log_api_call
@@ -7062,10 +7094,16 @@ class API:
             def on_db_error(task):
                 pass
 
+            capability = self.github_mgr.github_url_capability(url) or "raw"
+            candidates = self.github_mgr._github_download_candidates(url)
+            url, *fallback_urls = candidates
             task_id = self.download_mgr.add_task(
                 url=url,
                 dest_dir=file_folder,
                 filename=file_name,
+                fallback_urls=fallback_urls,
+                validate_download=lambda path: json.loads(Path(path).read_text(encoding="utf-8-sig")),
+                on_source_result=lambda source, success: self.github_mgr.record_mirror_result(source, success=success, capability=capability),
                 on_complete=on_db_ready,
                 on_error=on_db_error,
                 title=spec["start_message"],
@@ -8547,6 +8585,46 @@ class API:
         except Exception as e:
             logger.error("获取 Git 仓库 README 失败: %s", e, exc_info=True)
             return ApiResponse.error("获取 Git 仓库 README 失败", code="GITHUB.README_FETCH_FAILED", detail=e, context={"url": url, "source_branch": source_branch}, user_message=tr("api.github.readme_fetch_failed", "获取 Git 仓库 README 失败。请检查网络连接、仓库地址和分支名称后重试。"))
+
+    @log_api_call
+    def github_probe_mirror(self, mirror: dict[str, Any]):
+        """在新增或编辑镜像时独立探测其支持的 GitHub 能力。"""
+        try:
+            result = self.github_mgr.probe_github_mirror(mirror)
+            return ApiResponse.success(result)
+        except Exception as exc:
+            logger.warning("GitHub 镜像能力探测失败: %s", exc)
+            return ApiResponse.error(
+                "GitHub 镜像能力探测失败",
+                code="GITHUB.MIRROR_PROBE_FAILED",
+                detail=exc,
+                user_message="镜像探测未完成，请检查地址和网络连接后重试。",
+            )
+
+    @log_api_call
+    def github_mirror_catalog(self):
+        """读取动态 GitHub 镜像节点目录缓存，不发起网络请求。"""
+        return ApiResponse.success(self.github_mgr.get_github_mirror_catalog())
+
+    @log_api_call
+    def github_refresh_mirror_catalog(self, payload: Any = None):
+        """刷新动态镜像节点目录：先按远端状态筛选，再本地探测候选能力。"""
+        try:
+            probe_limit = 24
+            if isinstance(payload, dict):
+                try:
+                    probe_limit = max(1, min(48, int(payload.get("probe_limit", 24))))
+                except (TypeError, ValueError):
+                    probe_limit = 24
+            return ApiResponse.success(self.github_mgr.start_mirror_catalog_refresh(force=True, probe_limit=probe_limit))
+        except Exception as exc:
+            logger.warning("GitHub 动态镜像目录刷新失败: %s", exc)
+            return ApiResponse.error(
+                "GitHub 动态镜像目录刷新失败",
+                code="GITHUB.MIRROR_CATALOG_FAILED",
+                detail=exc,
+                user_message="动态镜像节点目录刷新失败，将继续使用已有缓存和直连。",
+            )
 
     @staticmethod
     def _normalize_github_install_options(value: Any, default_ref_type: str = "branch") -> dict[str, str]:

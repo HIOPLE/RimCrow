@@ -24,7 +24,7 @@ class TestWorkshopPageRenderer(unittest.TestCase):
         self.assertIn("data-rimcrow-proxy-url", bridge_script)
         self.assertNotIn("data-proxy-url", bridge_script)
 
-    def test_render_uses_managed_proxy_for_workshop_request(self):
+    def test_render_leaves_proxy_routing_to_managed_session(self):
         captured = {}
 
         class FakeResponse:
@@ -47,7 +47,7 @@ class TestWorkshopPageRenderer(unittest.TestCase):
 
         self.assertIn("Demo", html)
         self.assertEqual(captured["url"], "https://steamcommunity.com/sharedfiles/filedetails/?id=123")
-        self.assertEqual(captured["kwargs"]["proxies"], {"http": "http://127.0.0.1:10808", "https": "http://127.0.0.1:10808"})
+        self.assertNotIn("proxies", captured["kwargs"])
         self.assertIn("User-Agent", captured["kwargs"]["headers"])
         self.assertNotIn(429, retry_factory.call_args.kwargs["status_forcelist"])
 
