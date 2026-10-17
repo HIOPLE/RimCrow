@@ -333,6 +333,20 @@ const downloadLinks = computed(() => {
       note: t('ui.settings.about.lanzou_mirror_note', '网络不稳定时，可以尝试从这里下载备用包。'),
     })
   }
+  for (const source of aboutMeta.value.update.sources || []) {
+    const type = String(source?.type || '').trim().toLowerCase()
+    const url = String(source?.url || '').trim()
+    if (!url || !['sourceforge', 'gitee'].includes(type)) continue
+    links.push({
+      label: type === 'sourceforge'
+        ? t('ui.settings.about.sourceforge_mirror', 'SourceForge 下载')
+        : t('ui.settings.about.gitee_mirror', 'Gitee 仓库'),
+      url,
+      note: type === 'sourceforge'
+        ? t('ui.settings.about.sourceforge_mirror_note', '提供稳定的公开发布包下载入口。')
+        : t('ui.settings.about.gitee_mirror_note', '国内代码仓库与后续发行版备用来源。'),
+    })
+  }
   return links
 })
 const feedbackItems = computed(() => [

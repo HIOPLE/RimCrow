@@ -9,6 +9,9 @@ from typing import Any, Dict, Optional, List
 from abc import ABC, abstractmethod
 import zipfile
 import requests
+import platform
+import re
+from urllib.parse import urlsplit
 from packaging import version
 from backend._version import __version__
 from backend.utils.lanzou_parser import LanzouParser
@@ -18,6 +21,7 @@ from backend.utils.restart import PYINSTALLER_ENV_VARS_TO_CLEAR, launch_new_appl
 from backend.settings import BASE_RESOURCE_DIR, HOME_DIR, settings, UPDATE_DIR, backup_config_for_update
 from backend.managers.mgr_download import DownloadManager, DownloadTask
 from backend.managers.mgr_github import GithubApiError, GithubManager
+from backend.managers.mgr_network import build_retry_session, network_mgr
 from backend.utils.event_bus import EventBus
 from backend.utils.error_contract import classify_exception
 from backend.utils.tools import get_current_package_platform_keywords, get_package_platform_match, has_supported_update_package_name, validate_zip_archive
@@ -25,6 +29,11 @@ from backend.utils.tools import get_current_package_platform_keywords, get_packa
 # 确保缓存目录存在
 os.makedirs(UPDATE_DIR, exist_ok=True)
 
+
+def _request_update(url: str, **kwargs: Any) -> requests.Response:
+    """通过统一 RoutedSession 请求更新资源，避免更新链路绕过代理/Hosts 路由。"""
+    with build_retry_session(route_manager=network_mgr) as session:
+        return session.get(url, **kwargs)
 
 def _build_env_cleanup_commands() -> str:
     """生成批处理中用于清理/重置运行时环境变量的命令。"""
@@ -178,6 +187,204 @@ class LanzouSource(UpdateSource):
             )
         return None
 
+# --- SourceForge 最新发布源 ---
+class SourceForgeSource(UpdateSource):
+    """通过 SourceForge 的 latest 下载入口解析当前 Windows 发布包。"""
+
+    def __init__(self, project_url: str):
+        self.project_url = str(project_url or "").strip().rstrip("/")
+        # format=json 让 SourceForge 返回可跟随的 302 下载地址，避免普通自动请求被边缘防护直接返回 403。
+        self.latest_download_url = f"{self.project_url}/files/latest/download?format=json" if self.project_url else ""
+
+    @staticmethod
+    def _format_size(raw_size: Any) -> Optional[str]:
+        try:
+            size = int(raw_size or 0)
+        except (TypeError, ValueError):
+            return None
+        if size <= 0:
+            return None
+        if size >= 1024 * 1024:
+            return f"{size / 1024 / 1024:.1f} MB"
+        if size >= 1024:
+            return f"{size / 1024:.1f} KB"
+        return f"{size} B"
+
+    @staticmethod
+    def _extract_release_info(response: requests.Response) -> tuple[str, str]:
+        values = [str(response.headers.get("Content-Disposition") or ""), str(response.url or "")]
+        values.extend(str(item.url or "") for item in getattr(response, "history", []) if getattr(item, "url", ""))
+        text = " ".join(values)
+        version_match = re.search(r"(?<!\d)v?(\d+(?:\.\d+){1,})", text, re.IGNORECASE)
+        filename_match = re.search(r"filename\*=UTF-8''([^;]+)|filename=\"?([^;\"]+)", text, re.IGNORECASE)
+        filename = next((value for value in (filename_match.groups() if filename_match else ()) if value), "")
+        return (version_match.group(1) if version_match else ""), filename
+
+    def check(self) -> Optional[UpdateInfo]:
+        if not self.latest_download_url:
+            raise UpdateSourceError("SourceForge 更新源缺少项目地址")
+        response = None
+        try:
+            response = _request_update(
+                self.latest_download_url,
+                stream=True,
+                allow_redirects=True,
+                timeout=(5, 20),
+                headers={"User-Agent": "RimCrow/UpdateChecker"},
+            )
+            response.raise_for_status()
+            remote_v, filename = self._extract_release_info(response)
+            if not remote_v:
+                raise UpdateSourceError("SourceForge 未能从最新下载地址解析版本号")
+            if version.parse(remote_v) <= version.parse(__version__):
+                return None
+            return UpdateInfo(
+                has_update=True,
+                version=remote_v,
+                changelog="SourceForge 最新发布包",
+                download_url=self.latest_download_url,
+                source_name="SourceForge",
+                file_size=self._format_size(response.headers.get("Content-Length")),
+                publish_time=str(response.headers.get("Last-Modified") or ""),
+                local_status="remote",
+            )
+        except UpdateSourceError:
+            raise
+        except requests.RequestException as exc:
+            raise UpdateSourceError(f"SourceForge 更新源请求失败: {exc}") from exc
+        except Exception as exc:
+            raise UpdateSourceError(f"SourceForge 更新源解析失败: {exc}") from exc
+        finally:
+            if response is not None:
+                response.close()
+
+# --- 静态更新清单源 ---
+class ManifestSource(UpdateSource):
+    """读取静态 JSON 清单，并把同一文件的多个镜像交给现有回退链路。"""
+
+    def __init__(self, manifest_url: str, source_id: str = "", label: str = ""):
+        self.url = str(manifest_url or "").strip()
+        self.source_id = str(source_id or "").strip()
+        self.label = str(label or self.source_id or "更新清单").strip()
+
+    @staticmethod
+    def _format_size(raw_size: Any) -> Optional[str]:
+        try:
+            size = int(raw_size or 0)
+        except (TypeError, ValueError):
+            return None
+        if size <= 0:
+            return None
+        if size >= 1024 * 1024:
+            return f"{size / 1024 / 1024:.1f} MB"
+        if size >= 1024:
+            return f"{size / 1024:.1f} KB"
+        return f"{size} B"
+
+    @staticmethod
+    def _is_current_platform(asset: Dict[str, Any]) -> bool:
+        target = str(asset.get("platform") or "").strip().lower().replace("_", "-")
+        machine = platform.machine().lower()
+        if os.name == "nt":
+            current = "windows-arm64" if "arm" in machine else "windows-x64"
+            return target in {current, "windows", "win", "all", "any"}
+        if sys.platform.startswith("linux"):
+            current = "linux-arm64" if "aarch64" in machine or "arm64" in machine else "linux-x64"
+            return target in {current, "linux", "all", "any"}
+        if sys.platform == "darwin":
+            current = "macos-arm64" if "arm" in machine else "macos-x64"
+            return target in {current, "macos", "darwin", "all", "any"}
+        return False
+
+    @staticmethod
+    def _normalize_hash(raw_hash: Any) -> Optional[str]:
+        value = str(raw_hash or "").strip().lower()
+        return value if len(value) == 64 and all(char in "0123456789abcdef" for char in value) else None
+
+    def _request_manifest(self) -> Dict[str, Any]:
+        if not self.url:
+            raise UpdateSourceError("更新清单地址为空")
+        if urlsplit(self.url).scheme.lower() != "https":
+            raise UpdateSourceError("更新清单必须使用 HTTPS 地址")
+        response = None
+        try:
+            response = _request_update(self.url, timeout=(5, 20), headers={"Accept": "application/json", "User-Agent": "RimCrow/UpdateChecker"})
+            response.raise_for_status()
+            payload = response.json()
+        except requests.RequestException as exc:
+            raise UpdateSourceError(f"更新清单请求失败: {exc}") from exc
+        except ValueError as exc:
+            raise UpdateSourceError("更新清单不是有效的 JSON（可能返回了 HTML 错误页）") from exc
+        finally:
+            if response is not None:
+                response.close()
+        if not isinstance(payload, dict):
+            raise UpdateSourceError("更新清单格式无效")
+        return payload
+
+    def check(self) -> Optional[UpdateInfo]:
+        payload = self._request_manifest()
+        if payload.get("schema_version") != 1:
+            raise UpdateSourceError("更新清单 schema_version 必须为 1")
+        if str(payload.get("product") or "").strip().lower() != "rimcrow":
+            raise UpdateSourceError("更新清单产品不匹配")
+        remote_version = str(payload.get("version") or "").strip().lstrip("v")
+        if not remote_version:
+            raise UpdateSourceError("更新清单缺少版本号")
+        try:
+            if version.parse(remote_version) <= version.parse(__version__):
+                return None
+        except version.InvalidVersion as exc:
+            raise UpdateSourceError(f"更新清单版本号无效: {remote_version}") from exc
+
+        assets = payload.get("assets")
+        if not isinstance(assets, list):
+            raise UpdateSourceError("更新清单 assets 格式无效")
+        matching_assets = [item for item in assets if isinstance(item, dict) and self._is_current_platform(item)]
+        asset = next((item for item in matching_assets if str(item.get("platform") or "").strip().lower().replace("_", "-") not in {"", "all", "any", "windows", "win", "linux", "macos", "darwin"}), None)
+        asset = asset or (matching_assets[0] if matching_assets else None)
+        if not asset:
+            raise UpdateSourceError("更新清单没有当前平台的安装包")
+
+        file_hash = self._normalize_hash(asset.get("sha256") or asset.get("file_hash"))
+        if not file_hash:
+            raise UpdateSourceError("更新清单安装包缺少有效的 SHA-256")
+        mirrors = asset.get("mirrors") or []
+        if not isinstance(mirrors, list):
+            raise UpdateSourceError("更新清单 mirrors 格式无效")
+        candidates: list[UpdateInfo] = []
+        seen_urls: set[str] = set()
+        for mirror in mirrors:
+            if not isinstance(mirror, dict):
+                continue
+            download_url = str(mirror.get("url") or "").strip()
+            if urlsplit(download_url).scheme.lower() != "https":
+                continue
+            parsed_url = urlsplit(download_url)
+            if not parsed_url.netloc:
+                continue
+            url_key = download_url.rstrip("/").casefold()
+            if url_key in seen_urls:
+                continue
+            seen_urls.add(url_key)
+            label = str(mirror.get("label") or mirror.get("id") or self.label).strip()
+            candidates.append(UpdateInfo(
+                has_update=True,
+                version=remote_version,
+                changelog=str(payload.get("changelog") or "无更新日志"),
+                download_url=download_url,
+                source_name=label,
+                file_size=self._format_size(asset.get("size")),
+                file_hash=file_hash,
+                hash_algorithm="sha256",
+                publish_time=str(payload.get("published_at") or ""),
+            ))
+        if not candidates:
+            raise UpdateSourceError("更新清单没有有效下载地址")
+
+        primary = candidates[0]
+        primary.sources = [item.to_source_dict() for item in candidates]
+        return primary
 
 # --- GitHub 源实现 (预留) ---
 class GithubSource(UpdateSource):
@@ -287,6 +494,71 @@ class GithubSource(UpdateSource):
         return f"{size} B"
 
 
+class GiteeSource(GithubSource):
+    """读取 Gitee 公开 Release；仓库尚未发布 Release 时按无更新处理。"""
+
+    def check(self) -> Optional[UpdateInfo]:
+        response = None
+        try:
+            owner, repo = self._parse_repo()
+            api_url = f"https://gitee.com/api/v5/repos/{owner}/{repo}/releases/latest"
+            response = _request_update(
+                api_url,
+                timeout=(5, 20),
+                headers={"Accept": "application/json", "User-Agent": "RimCrow/UpdateChecker"},
+            )
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            release = response.json()
+            if not isinstance(release, dict) or release.get("prerelease") or release.get("draft"):
+                return None
+            remote_v = self._normalize_version(release.get("tag_name") or release.get("name") or "")
+            if not remote_v or version.parse(remote_v) <= version.parse(__version__):
+                return None
+            # Gitee 不同 API 版本可能返回 browser_download_url 或 download_url。
+            # 统一成现有选择器使用的字段，避免因字段名差异漏掉发行包。
+            raw_assets = release.get("assets") or []
+            normalized_assets = []
+            for raw_asset in raw_assets:
+                if not isinstance(raw_asset, dict):
+                    continue
+                asset_copy = dict(raw_asset)
+                asset_copy["browser_download_url"] = str(
+                    asset_copy.get("browser_download_url")
+                    or asset_copy.get("download_url")
+                    or ""
+                ).strip()
+                normalized_assets.append(asset_copy)
+            asset = self._select_asset(normalized_assets)
+            if not asset:
+                logger.warning(f"Gitee 更新源未找到适合当前系统的 zip 附件: repo={self.repo}, version={remote_v}")
+                return None
+            digest = asset.get("digest")
+            if not digest and asset.get("sha256"):
+                digest = f"sha256:{asset.get('sha256')}"
+            hash_algorithm, file_hash = self._parse_asset_digest(digest)
+            return UpdateInfo(
+                has_update=True,
+                version=remote_v,
+                changelog=str(release.get("body") or "无更新日志"),
+                download_url=str(asset.get("browser_download_url") or asset.get("download_url") or ""),
+                source_name="Gitee",
+                file_size=self._format_size(asset.get("size")),
+                file_hash=file_hash,
+                hash_algorithm=hash_algorithm,
+                publish_time=str(release.get("published_at") or release.get("created_at") or ""),
+                local_status="remote",
+            )
+        except (GithubApiError, requests.RequestException) as exc:
+            raise UpdateSourceError(f"Gitee 更新源请求失败: {exc}") from exc
+        except Exception as exc:
+            raise UpdateSourceError(f"Gitee 更新源解析失败: {exc}") from exc
+        finally:
+            if response is not None:
+                response.close()
+
+
 def _project_meta_candidate_paths() -> List[str]:
     return [
         os.path.join(HOME_DIR, "frontend", "public", "project-meta.json"),
@@ -312,6 +584,24 @@ def _load_project_meta() -> Dict[str, Any]:
 
 def _create_configured_update_source(config: Dict[str, Any], default_github_repo: str = "") -> Optional[UpdateSource]:
     source_type = str(config.get("type") or "").strip().lower()
+    if source_type in {"manifest", "update_manifest"}:
+        manifest_url = str(config.get("url") or "").strip()
+        if not manifest_url:
+            logger.warning("项目元数据中的更新清单缺少 url，已跳过")
+            return None
+        return ManifestSource(manifest_url, str(config.get("id") or "").strip(), str(config.get("label") or "").strip())
+    if source_type in {"sourceforge", "source_forge"}:
+        project_url = str(config.get("url") or "").strip()
+        if not project_url:
+            logger.warning("项目元数据中的 SourceForge 更新源缺少 url，已跳过")
+            return None
+        return SourceForgeSource(project_url)
+    if source_type == "gitee":
+        repo = str(config.get("repo") or "").strip()
+        if not repo:
+            logger.warning("项目元数据中的 Gitee 更新源缺少 repo，已跳过")
+            return None
+        return GiteeSource(repo)
     if source_type == "lanzou":
         folder_url = str(config.get("url") or "").strip()
         if not folder_url:
@@ -424,6 +714,22 @@ class UpdateManager:
         latest_sources = [info for parsed_version, info in candidates if parsed_version == latest_parsed_version]
         latest_version = latest_sources[0].version
 
+        # 清单源可能在一个 UpdateInfo 中携带多个同版本镜像，展开后沿用现有回退逻辑。
+        expanded_sources: List[UpdateInfo] = []
+        seen_source_keys: set[str] = set()
+        for item in latest_sources:
+            nested = item.sources or [item.to_source_dict()]
+            for raw_source in nested:
+                candidate = self._update_info_from_source(raw_source)
+                if not candidate or candidate.version != latest_version or not candidate.download_url:
+                    continue
+                key = self._source_key(candidate.to_source_dict())
+                if key in seen_source_keys:
+                    continue
+                seen_source_keys.add(key)
+                expanded_sources.append(candidate)
+        latest_sources = expanded_sources or latest_sources
+
         # 2. 智能缓存匹配：缓存包也作为同版本来源参与展示，且优先安装。
         if not any(item.source_name == "本地缓存" and item.local_status == "ready" for item in latest_sources):
             cached_path = self._find_cached_file(latest_version)
@@ -457,6 +763,9 @@ class UpdateManager:
     def _source_display_name(source: UpdateSource) -> str:
         if isinstance(source, LocalSource): return "本地缓存"
         if isinstance(source, LanzouSource): return "蓝奏云"
+        if isinstance(source, ManifestSource): return source.label
+        if isinstance(source, SourceForgeSource): return "SourceForge"
+        if isinstance(source, GiteeSource): return "Gitee"
         if isinstance(source, GithubSource): return "GitHub"
         return source.__class__.__name__
 
