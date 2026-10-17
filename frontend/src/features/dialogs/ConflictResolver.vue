@@ -53,7 +53,7 @@
                     <span class="truncate font-mono text-sm font-black text-accent-highlight">
                       {{ group.package_id }}
                     </span>
-                    <span tabindex="0" class="rounded-full border px-2 py-0.5 text-[0.7rem] font-black uppercase tracking-[0.14em] cursor-help"
+                    <span tabindex="0" class="rounded-full border px-2 py-0.5 text-[0.7rem] font-black tracking-[0.14em] cursor-help"
                       :class="group._type === 'hard'
                         ? 'border-accent-danger/28 bg-accent-danger/10 text-accent-danger'
                         : 'border-accent-primary/25 bg-accent-primary/10 text-accent-primary'"
@@ -155,7 +155,7 @@
           <aside class="w-75 shrink-0 overflow-y-auto border-l border-border-base/10 bg-[linear-gradient(180deg,rgba(var(--rgb-bg-deep),0.9),rgba(var(--rgb-bg-inset),0.92))] px-4 py-4">
             <div class="space-y-3">
               <section class="modal-section p-3" data-tour="conflict-batch">
-                <div class="text-xs font-black uppercase tracking-[0.16em] text-text-dim">{{ t('dialog.conflict.batch_title', '批量选择') }}</div>
+                <div class="text-xs font-black tracking-[0.16em] text-text-dim">{{ t('dialog.conflict.batch_title', '批量选择') }}</div>
                 <p class="mt-1 text-xs leading-5 text-text-dim">
                   {{ t('dialog.conflict.batch_desc', '选范围，选保留谁，再选其余副本怎么处理。') }}
                 </p>

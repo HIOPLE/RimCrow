@@ -2,8 +2,8 @@
 <template>
 <div class="relative mx-0 p-0" :aria-disabled="disabled" :class="[{'flex items-center gap-1 min-w-0 max-w-full flex-1 basis-0' : mini}, disabled ? 'opacity-50' : '']">
     <!-- Label：点击时联动聚焦 -->
-    <span v-if="label" class="block text-xs shrink-0 text-text-dim uppercase font-bold tracking-widest px-1 cursor-pointer hover:text-text-main transition-colors" 
-      :class="[mini ? '' : 'mb-1']" @click="handleLabelClick" >
+    <span v-if="label" class="block text-xs shrink-0 text-text-dim font-bold tracking-widest px-1 cursor-pointer hover:text-text-main transition-colors" 
+      :class="[mini ? '' : 'mb-1']" @pointerdown.stop @click="toggleMenu" >
       {{ label }}
       <label v-if="description" v-tooltip="description" class="text-text-dim ml-0.5 cursor-help italic underline hover:text-text-main">?</label>
     </span>
@@ -15,7 +15,7 @@
            mini ? 'py-1 pl-2 pr-7 text-xs' : 'w-full h-9 px-3', editable ? 'cursor-text' : ' bg-bg-surface',
           { 'cursor-pointer': !editable && !disabled, 'cursor-text': editable && !disabled, 'cursor-not-allowed text-text-disabled': disabled }
         ]"
-        @click="openMenu"
+        @click="toggleMenu"
         @input="handleInput"
         @keydown="handleKeydown"
         @blur="handleBlur"
@@ -177,11 +177,6 @@ const isMatch = (opt) => {
 
 
 // 1. 切换开关
-const handleLabelClick = () => {
-  if (props.disabled) return
-  openMenu()
-}
-
 const openMenu = () => {
   if (props.disabled) return
   if (isOpen.value) return
@@ -196,6 +191,12 @@ const openMenu = () => {
   }
   // 聚焦输入框
   nextTick(() => inputRef.value?.focus())
+}
+
+const toggleMenu = () => {
+  if (props.disabled) return
+  if (isOpen.value) return closeMenu()
+  openMenu()
 }
 
 const closeMenu = () => {

@@ -3,7 +3,7 @@
     <Transition name="slide-left" appear>
       <div v-if="appStore.uiState.showProfileDrawer" class="fixed inset-y-8 top-18 left-0 z-100 flex w-100 max-w-[calc(100vw-1rem)] flex-col" >
         <!-- 1. 上方内凹边角 (对称自 ListDiffView) -->
-        <div class="absolute -top-[1.1rem] left-0 w-5 h-5 z-10 ">
+        <div class="absolute top-[-1.1rem] left-0 w-5 h-5 z-10 ">
           <div class="w-full h-full bg-bg-elevated/90 backdrop-blur-xl mask-[radial-gradient(circle_at_100%_0,transparent_1.25rem,black_1rem)]"></div>
           <svg class="absolute inset-0 w-full h-full text-border-default fill-none pointer-events-none" viewBox="0 0 20 20">
             <path d="M0,0 A20,20 0 0,0 20,20" stroke="currentColor" stroke-width="2" />
@@ -33,7 +33,7 @@
           <!-- 列表区 -->
           <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar" data-tour="profile-list">
             <!-- 当前激活标识 -->
-            <div class="px-2 text-[0.65rem] font-bold text-text-dim uppercase tracking-tighter opacity-60">{{ t('ui.profiles.drawer.recorded_profiles', '已记录环境') }}</div>
+            <div class="px-2 text-[0.65rem] font-bold text-text-dim tracking-tighter opacity-60">{{ t('ui.profiles.drawer.recorded_profiles', '已记录环境') }}</div>
 
             <div v-for="p in profileStore.profiles" :key="p.id"
               @click="p.check ? profileStore.switchProfile(p.id) : null"
@@ -108,7 +108,7 @@
 
             <!-- 待恢复/孤立环境 -->
             <div v-if="profileStore.orphanedProfiles.length > 0" class="mt-8 space-y-3">
-              <div class="px-2 text-[0.65rem] font-bold text-accent-warn uppercase tracking-tighter">{{ t('ui.profiles.drawer.orphaned_profiles', '待恢复环境') }}</div>
+              <div class="px-2 text-[0.65rem] font-bold text-accent-warn tracking-tighter">{{ t('ui.profiles.drawer.orphaned_profiles', '待恢复环境') }}</div>
               <div v-for="orphan in profileStore.orphanedProfiles" :key="orphan.id"
                 class="p-4 rounded-xl border border-dashed border-accent-warn/30 bg-accent-warn/5 flex items-center justify-between group">
                 <div class="min-w-0">
@@ -133,7 +133,7 @@
         </div>
 
         <!-- 3. 下方内凹边角 -->
-        <div class="absolute -bottom-[1.2rem] left-0 w-5 h-5 z-10 rotate-90">
+        <div class="absolute bottom-[-1.2rem] left-0 w-5 h-5 z-10 rotate-90">
           <div class="w-full h-full bg-bg-elevated/90 mask-[radial-gradient(circle_at_100%_0,transparent_1.25rem,black_1rem)]"></div>
           <svg class="absolute inset-0 w-full h-full text-border-default fill-none pointer-events-none" viewBox="0 0 20 20">
             <path d="M0,0 A20,20 0 0,0 20,20" stroke="currentColor" stroke-width="2" />

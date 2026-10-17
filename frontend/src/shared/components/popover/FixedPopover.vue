@@ -2,7 +2,8 @@
 <template>
   <Teleport to="body">
     <Transition name="popover-fade">
-      <div v-if="isOpen" ref="popoverRef" class="fixed" data-fixed-popover :style="containerStyle">
+      <!-- 定位壳只负责摆放，不应挡住壳外的页面点击；实际内容层单独恢复命中。 -->
+      <div v-if="isOpen" ref="popoverRef" class="fixed pointer-events-none" data-fixed-popover :style="containerStyle">
         <template v-if="framed">
           <div :class="surfaceWrapperClass">
             <div class="min-h-0 overflow-hidden rounded-xl border border-border-base/10 bg-glass-medium backdrop-blur-xl" :style="contentStyle">
@@ -263,7 +264,7 @@ const containerStyle = computed(() => ({
 }))
 
 const surfaceWrapperClass = computed(() => ([
-  'w-fit max-w-full',
+  'pointer-events-auto w-fit max-w-full',
   'rounded-xl shadow-[0_18px_50px_var(--shadow-color)]'
 ]))
 

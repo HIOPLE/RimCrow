@@ -71,7 +71,7 @@
                     <div class="flex items-center gap-1.5">
                       <div class="w-full">
                         <div class="flex justify-between items-center px-1 mb-1">
-                          <label class="text-xs text-text-dim uppercase font-bold tracking-widest">
+                          <label class="text-xs text-text-dim font-bold tracking-widest">
                             {{ t('ui.settings.external.git_provider_catalog_sources', 'Git 推荐清单来源') }}
                             <span v-tooltip="t('tooltip.settings.external.git_provider_catalog_sources', '每行一个来源，格式：名称|URL。留空时使用默认推荐清单。')" class="text-text-dim ml-1 cursor-help italic underline hover:text-text-main">?</span>
                           </label>
