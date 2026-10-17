@@ -107,8 +107,8 @@ class TestPackPyInstaller(unittest.TestCase):
 
         with zipfile.ZipFile(zip_path) as archive:
             names = archive.namelist()
-            self.assertIn("RimCrow/docs/RimCrow 使用说明.pdf", names)
-            self.assertIn("RimCrow/docs/zh-CN/01-快速上手.pdf", names)
+            self.assertIn("RimCrow/RimCrow 使用说明.pdf", names)
+            self.assertIn("RimCrow/zh-CN/01-快速上手.pdf", names)
 
     def test_build_release_docs_keeps_existing_pdfs_without_command(self):
         docs_dir = self.temp_dir / "docs"
