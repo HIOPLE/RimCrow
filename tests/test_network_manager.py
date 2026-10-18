@@ -13,8 +13,12 @@ from pathlib import Path
 import requests
 from unittest.mock import Mock, call, patch
 
-from backend.managers.mgr_network import NetworkManager, PROXY_ENV_KEYS, RoutedSession, build_retry_session
 from backend.settings import NetworkConfig, settings
+from backend.utils.system_hosts import SystemHostsService
+
+# 导入单例时不得应用个人配置或操作真实系统文件。
+with patch.object(settings.config, "network", NetworkConfig(github_hosts_enabled=False)), patch.object(SystemHostsService, "submit"):
+    from backend.managers.mgr_network import NetworkManager, PROXY_ENV_KEYS, RoutedSession, build_retry_session
 
 
 class TestGithubHostsBackgroundRefresh(unittest.TestCase):
@@ -29,8 +33,86 @@ class TestGithubHostsBackgroundRefresh(unittest.TestCase):
         cache_patch = patch("backend.managers.mgr_network.GITHUB_HOSTS_CACHE_PATH", self.cache_path)
         cache_patch.start()
         self.addCleanup(cache_patch.stop)
-        with patch.object(NetworkManager, "apply"), patch("backend.managers.mgr_network.atexit.register"):
+        with patch.object(NetworkManager, "apply"):
             self.manager = NetworkManager()
+        self.addCleanup(self._wait_cache)
+        self.addCleanup(self.manager.close)
+
+    def _wait_cache(self):
+        thread = self.manager._hosts_cache_thread
+        if thread is not None:
+            thread.join(2)
+
+    def test_system_hosts_authorization_is_explicit_and_preview_never_applies(self):
+        self.network.github_hosts_enabled = False
+        self.network.write_to_system_hosts = True
+        self.network.hosts = {"saved.example": "1.2.3.4"}
+        with patch.object(self.manager._system_hosts, "submit") as submit:
+            self.manager.apply(startup=True)
+            submit.assert_called_with({"saved.example": "1.2.3.4"}, allow_elevation=False)
+            self.manager.apply(allow_system_hosts_elevation=True)
+            submit.assert_called_with({"saved.example": "1.2.3.4"}, allow_elevation=True)
+            self.manager._github_hosts_preview_state = {"status": "ready", "source_url": "unsaved", "hosts": {"preview.example": "5.6.7.8"}, "updated_at": 1}
+            state = self.manager.retry_system_hosts()
+            submit.assert_called_with({"saved.example": "1.2.3.4"}, allow_elevation=True)
+        self.assertNotIn("preview.example", state["effective_hosts"])
+
+    def test_system_hosts_errors_have_persistent_localized_messages(self):
+        for code, key in (("ELEVATION_CANCELLED", "authorization_cancelled"), ("AUTHORIZATION_TIMEOUT", "authorization_timeout"),
+                           ("CONTENT_CHANGED", "content_changed"), ("TIMEOUT", "write_timeout")):
+            with self.subTest(code=code), patch.object(self.manager._system_hosts, "status", return_value={
+                "status": "error", "error_code": f"NETWORK.HOSTS.{code}", "removing": False,
+            }):
+                state = self.manager.get_github_hosts_status()["system_hosts"]
+                self.assertEqual(state["message_key"], f"network.hosts.{key}")
+                self.assertTrue(state["message"])
+        message = self.manager._system_hosts_message({"status": "error", "removing": True})
+        self.assertEqual(message.message_key, "network.hosts.system_remove_failed")
+
+    def test_system_write_does_not_hold_network_lock_or_delay_save_apply(self):
+        self.network.github_hosts_enabled = False
+        self.network.write_to_system_hosts = True
+        self.network.hosts = {"example.org": "1.2.3.4"}
+        started, release = threading.Event(), threading.Event()
+
+        def write(hosts, **kwargs):
+            started.set()
+            release.wait(2)
+            return {"status": "success", "error_code": ""}
+
+        with patch.object(self.manager._system_hosts, "_execute", side_effect=write):
+            try:
+                self.manager.apply()
+                self.assertTrue(started.wait(1))
+                before = time.perf_counter()
+                state = self.manager.get_github_hosts_status()
+                self.assertLess(time.perf_counter() - before, 0.2)
+                self.assertEqual(state["system_hosts"]["status"], "applying")
+                self.assertEqual(state["effective_hosts"], {"example.org": "1.2.3.4"})
+            finally:
+                release.set()
+                self.manager.close()
+        self.assertFalse(self.manager._system_hosts._thread.is_alive())
+
+    def test_close_cancels_wait_for_dynamic_source_without_late_commit(self):
+        started, release = threading.Event(), threading.Event()
+
+        def fetch(*args, **kwargs):
+            started.set()
+            release.wait(2)
+            return Mock(text="1.2.3.4 example.org")
+
+        with patch("backend.managers.mgr_network.requests.Session.get", side_effect=fetch), patch.object(self.manager, "_apply_hosts") as apply:
+            try:
+                self.manager.refresh_github_hosts()
+                self.assertTrue(started.wait(1))
+                self.manager.close()
+                self.manager._github_hosts_thread.join(0.5)
+                self.assertFalse(self.manager._github_hosts_thread.is_alive())
+                apply.assert_not_called()
+                self.assertFalse(self.cache_path.exists())
+            finally:
+                release.set()
 
     def test_disabled_preview_hosts_ignore_stale_effective_hosts_payload(self):
         route = self.manager.request_route(
@@ -104,6 +186,7 @@ class TestGithubHostsBackgroundRefresh(unittest.TestCase):
         with patch("backend.managers.mgr_network.requests.Session.get", return_value=response), patch.object(self.manager, "_apply_hosts"):
             self.manager.refresh_github_hosts()
             self.manager._github_hosts_thread.join(2)
+            self._wait_cache()
             cache = self.cache_path.read_text(encoding="utf-8")
             self.manager.refresh_github_hosts({"github_hosts_enabled": True, "hosts_sources": [{"url": "https://other.example/hosts", "enabled": True}]})
             self.manager._github_hosts_preview_thread.join(2)
@@ -205,7 +288,7 @@ class TestNetworkTransportStartup(unittest.TestCase):
 
     def test_system_certificates_are_enabled_without_site_startup(self):
         site_packages = sysconfig.get_path('purelib')
-        code = f'import sys; sys.path.insert(0, {site_packages!r}); import ssl; assert ssl.SSLContext.__module__ == "ssl"; import backend.managers.mgr_network; assert "truststore" in ssl.SSLContext.__module__'
+        code = f'import sys; sys.path.insert(0, {site_packages!r}); import ssl; assert ssl.SSLContext.__module__ == "ssl"; from unittest.mock import patch; from backend.settings import settings, NetworkConfig; settings.config.network = NetworkConfig(github_hosts_enabled=False); from backend.utils.system_hosts import SystemHostsService; p = patch.object(SystemHostsService, "submit"); p.start(); import backend.managers.mgr_network; assert "truststore" in ssl.SSLContext.__module__'
         result = subprocess.run([sys.executable, '-S', '-c', code], capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -552,8 +635,9 @@ class TestNetworkManagerHostsCleanup(unittest.TestCase):
         self.assertEqual(NetworkManager.parse_github_hosts('1.2.3.4 example.org\n2.3.4.5 example.org'), {"example.org": "2.3.4.5"})
 
     def test_refresh_github_hosts_updates_runtime_map_without_system_hosts(self):
-        with patch.object(NetworkManager, "apply"), patch("backend.managers.mgr_network.atexit.register"):
+        with patch.object(NetworkManager, "apply"):
             manager = NetworkManager()
+        self.addCleanup(manager.close)
         response = Mock(status_code=200, text="140.82.112.4 github.com\n")
         response.raise_for_status.return_value = None
         network = settings.config.network
@@ -574,6 +658,8 @@ class TestNetworkManagerHostsCleanup(unittest.TestCase):
             patch.object(manager, "_apply_hosts"), patch("backend.managers.mgr_network.write_json_atomic"):
             manager.refresh_github_hosts()
             manager._github_hosts_thread.join(2)
+            if manager._hosts_cache_thread is not None:
+                manager._hosts_cache_thread.join(2)
         self.assertEqual(manager.get_github_hosts_status()["status"], "ready")
         self.assertEqual(fetch.call_args.kwargs["timeout"], (15, 60))
         response.close.assert_called_once()
@@ -591,24 +677,6 @@ class TestNetworkManagerHostsCleanup(unittest.TestCase):
         network.hosts = {" GitHub.COM. ": "140.82.112.4", "": ""}
 
         self.assertEqual(manager._effective_hosts(), {"github.com": "140.82.112.4"})
-
-    def test_remove_custom_block_removes_legacy_rimmodmanager_hosts_block(self):
-        manager = NetworkManager.__new__(NetworkManager)
-        manager.marker_start = "# --- RimCrow Hosts Start ---\n"
-        manager.marker_end = "# --- RimCrow Hosts End ---\n"
-        content = (
-            "before\n"
-            "# --- RimModManager Hosts Start ---\n"
-            "1.2.3.4\texample.invalid\n"
-            "# --- RimModManager Hosts End ---\n"
-            "after\n"
-        )
-
-        cleaned = manager._remove_custom_block(content)
-
-        self.assertNotIn("RimModManager Hosts", cleaned)
-        self.assertEqual(cleaned, "before\nafter\n")
-
 
 class TestRoutedRetrySession(unittest.TestCase):
     def test_explicit_false_disables_global_routing(self):

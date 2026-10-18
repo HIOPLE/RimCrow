@@ -4285,6 +4285,18 @@
       "import_success": "Import successful"
     }
   },
+  "network": {
+    "hosts": {
+      "authorization_cancelled": "Administrator approval was cancelled. System Hosts was not updated. In-app mappings are unaffected.",
+      "authorization_timeout": "Waiting for administrator approval timed out. System Hosts was not updated. Retry if needed.",
+      "content_changed": "Another program changed system Hosts. Stop simultaneous edits and retry.",
+      "permission_denied": "Permission to update system Hosts was denied. Retry and approve the administrator prompt, or check your security software.",
+      "permission_denied_unix": "Permission to update system Hosts was denied. Check the file permissions and retry. In-app mappings are unaffected.",
+      "system_apply_failed": "System Hosts could not be updated. In-app mappings remain available. Check file permissions or security software settings, then retry.",
+      "system_remove_failed": "Previous mappings may remain in system Hosts. Click retry to finish removing them.",
+      "write_timeout": "Updating system Hosts timed out and the result is unconfirmed. Retry to check and apply your saved settings."
+    }
+  },
   "secret": {
     "errors": {
       "backend_unavailable": "System credential storage is unavailable",
@@ -4578,7 +4590,9 @@
   "toast": {
     "api": {
       "error": "{workname} failed:\n{message}",
+      "network_advice": "If your connection is unstable, open Network to adjust connection settings or explore the recommended network optimization tools.",
       "open_corresponding_log": "View related system log",
+      "open_network_settings": "Open network settings",
       "success": "{workname} completed",
       "warning": "{workname} needs attention:\n{message}"
     },
@@ -4912,7 +4926,6 @@
       "install_cancelled": "Update installation cancelled.",
       "partial_no_update": "Some update sources are unavailable. No new version was found from the available sources.",
       "recommend_scan": "Run a full scan to apply the new version's core engine features.",
-      "start_failed": "Failed to start the update. Check the network connection, proxy settings, and install folder permissions.",
       "up_to_date": "You are already on the latest version."
     },
     "workspace": {
@@ -6429,6 +6442,8 @@
         "unbound": "Unbound"
       },
       "network": {
+        "community_tools_help": "These tools are maintained independently by the community. Download and enable them using their own instructions. Try one at a time to avoid conflicts.",
+        "community_tools_title": "Community network tools",
         "custom_hosts": "Custom Hosts mapping",
         "custom_hosts_desc": "Manually specify the IP address for a domain. Usually no changes are needed; use this only when you know the target address.",
         "dynamic_mirrors_enabled": "[UNTRANSLATED] 启用动态镜像节点",
@@ -6537,6 +6552,11 @@
         "steam_web_api_key_placeholder": "Enables enhanced search when filled",
         "steam_web_api_key_risk": "Anyone who obtains this Key can silently cancel a player's real trades without triggering Steam Guard, and replace them with fake trades sent to a scammer. Never share your API key with anyone or any unverified third-party website.",
         "steam_web_api_key_warning": "Warning: your API key is effectively a backdoor key to your Steam account. It can read public account data/inventory information and manage or listen to trade offers.",
+        "steamcommunity302_description": "Helps with connection issues on Steam Community, Workshop and similar pages. Try it when pages will not open or images fail to load.",
+        "steampp_description": "Improves access to Steam Community, Workshop and other sites, with extra Steam utilities such as account switching.",
+        "system_hosts_applying": "Updating system Hosts.",
+        "system_hosts_authorizing": "Waiting for administrator approval. Check the system prompt. Your settings can still be saved.",
+        "system_hosts_retry": "Retry saved system Hosts settings",
         "title": "Network protocol and proxy",
         "use_proxy_on_ai": "Use proxy for AI requests",
         "use_proxy_on_ai_desc": "When enabled, AI requests go through the proxy server. Do not enable this if the configured endpoint is already a local/domestic proxy.",
@@ -6544,8 +6564,9 @@
         "use_proxy_on_steamcmd_desc": "Whether SteamCMD uses the proxy server.\n\nWhen enabled, SteamCMD download, update, and install operations go through the proxy server.",
         "username": "Username",
         "visit": "Visit",
+        "visit_tool_website": "Visit tool website",
         "write_to_system_hosts": "Apply Hosts mappings to the system",
-        "write_to_system_hosts_desc": "Writes both dynamic and custom mappings to the system hosts file so other apps can use them. Usually unnecessary; this modifies a system file and may require administrator permission. The app attempts to remove its mappings when it exits."
+        "write_to_system_hosts_desc": "Write dynamic and custom mappings to system Hosts so other apps can use them. Usually unnecessary. On Windows, saving related settings or retrying may request administrator approval; startup updates and exit cleanup never prompt. Mappings are removed on exit when possible, but may remain without permission. To remove them, turn this off and save before exiting."
       },
       "panel": {
         "apply_and_save": "Apply and save settings",

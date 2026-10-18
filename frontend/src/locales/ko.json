@@ -4285,6 +4285,18 @@
       "import_success": "가져오기가 완료되었습니다."
     }
   },
+  "network": {
+    "hosts": {
+      "authorization_cancelled": "관리자 승인이 취소되어 시스템 Hosts가 업데이트되지 않았습니다. 앱 내부 매핑에는 영향이 없습니다.",
+      "authorization_timeout": "관리자 승인 대기 시간이 초과되어 시스템 Hosts가 업데이트되지 않았습니다. 필요하면 다시 시도하세요.",
+      "content_changed": "다른 프로그램이 시스템 Hosts를 변경했습니다. 동시에 수정하는 프로그램을 중지한 후 다시 시도하세요.",
+      "permission_denied": "시스템 Hosts를 업데이트할 권한이 없습니다. 다시 시도하여 관리자 승인을 허용하거나 보안 소프트웨어 설정을 확인하세요.",
+      "permission_denied_unix": "시스템 Hosts를 업데이트할 권한이 없습니다. 파일 권한을 확인한 후 다시 시도하세요. 앱 내부 매핑에는 영향이 없습니다.",
+      "system_apply_failed": "시스템 Hosts를 업데이트하지 못했습니다. 앱 내부 매핑은 계속 사용할 수 있습니다. 파일 권한이나 보안 소프트웨어 설정을 확인한 후 다시 시도하세요.",
+      "system_remove_failed": "이전 매핑이 시스템 Hosts에 남아 있을 수 있습니다. 다시 시도하여 제거를 완료하세요.",
+      "write_timeout": "시스템 Hosts 업데이트 시간이 초과되어 결과를 확인하지 못했습니다. 다시 시도하여 상태를 확인하고 저장된 설정을 적용하세요."
+    }
+  },
   "secret": {
     "errors": {
       "backend_unavailable": "시스템 자격 증명 저장소를 사용할 수 없습니다.",
@@ -4578,7 +4590,9 @@
   "toast": {
     "api": {
       "error": "{workname} 실패:\n{message}",
+      "network_advice": "연결이 불안정하면 “네트워크 연결”에서 연결 설정을 조정하거나 추천 네트워크 최적화 도구를 확인해 보세요.",
       "open_corresponding_log": "관련 시스템 로그 보기",
+      "open_network_settings": "네트워크 연결 설정 열기",
       "success": "{workname} 완료",
       "warning": "{workname}에는 주의가 필요합니다.\n{message}"
     },
@@ -4912,7 +4926,6 @@
       "install_cancelled": "업데이트 설치가 취소되었습니다.",
       "partial_no_update": "일부 업데이트 소스를 사용할 수 없습니다. 사용 가능한 소스에서 새 버전을 찾을 수 없습니다.",
       "recommend_scan": "새 버전의 핵심 엔진 기능을 적용하려면 전체 검사를 실행하세요.",
-      "start_failed": "업데이트를 시작하지 못했습니다. 네트워크 연결, 프록시 설정과 설치 폴더 권한을 확인하세요.",
       "up_to_date": "이미 최신 버전을 사용하고 있습니다."
     },
     "workspace": {
@@ -6429,6 +6442,8 @@
         "unbound": "매여 있지 않은"
       },
       "network": {
+        "community_tools_help": "커뮤니티에서 독립적으로 관리하는 도구입니다. 직접 다운로드한 뒤 각 도구의 안내에 따라 활성화하세요. 충돌을 피하려면 한 번에 하나씩 사용해 보세요.",
+        "community_tools_title": "커뮤니티 네트워크 도구 추천",
         "custom_hosts": "사용자 정의 호스트 매핑",
         "custom_hosts_desc": "도메인에 사용할 IP 주소를 직접 지정합니다. 일반적으로 변경할 필요가 없으며 대상 주소를 알고 있을 때만 사용하세요.",
         "dynamic_mirrors_enabled": "[UNTRANSLATED] 启用动态镜像节点",
@@ -6537,6 +6552,11 @@
         "steam_web_api_key_placeholder": "채워지면 향상된 검색이 활성화됩니다.",
         "steam_web_api_key_risk": "이 키를 획득한 사람은 누구나 Steam Guard를 실행하지 않고 플레이어의 실제 거래를 자동으로 취소하고 사기꾼에게 전송된 가짜 거래로 대체할 수 있습니다. API 키를 다른 사람이나 확인되지 않은 제3자 웹사이트와 공유하지 마세요.",
         "steam_web_api_key_warning": "경고: API 키는 사실상 Steam 계정에 대한 백도어 키입니다. 공개 계정 데이터/재고 정보를 읽고 거래 제안을 관리하거나 청취할 수 있습니다.",
+        "steamcommunity302_description": "Steam 커뮤니티, 창작마당 등의 페이지 연결 문제를 개선합니다. 페이지가 열리지 않거나 이미지가 로드되지 않을 때 사용해 보세요.",
+        "steampp_description": "Steam 커뮤니티, 창작마당 등의 사이트 접속을 개선하고 계정 전환 등 Steam 편의 기능을 제공합니다.",
+        "system_hosts_applying": "시스템 Hosts 업데이트 중",
+        "system_hosts_authorizing": "관리자 승인을 기다리고 있습니다. 시스템 승인 창을 확인하세요. 설정 저장에는 영향이 없습니다.",
+        "system_hosts_retry": "저장된 시스템 Hosts 설정 다시 적용",
         "title": "네트워크 프로토콜 및 프록시",
         "use_proxy_on_ai": "AI 요청에 프록시 사용",
         "use_proxy_on_ai_desc": "활성화되면 AI 요청이 프록시 서버를 통과합니다. 구성된 엔드포인트가 이미 로컬/국내 프록시인 경우에는 이를 활성화하지 마십시오.",
@@ -6544,8 +6564,9 @@
         "use_proxy_on_steamcmd_desc": "SteamCMD가 프록시 서버를 사용하는지 여부.\n\n활성화되면 SteamCMD 다운로드, 업데이트 및 설치 작업이 프록시 서버를 통해 진행됩니다.",
         "username": "사용자 이름",
         "visit": "방문하다",
+        "visit_tool_website": "도구 웹사이트 방문",
         "write_to_system_hosts": "Hosts 매핑을 시스템에 적용",
-        "write_to_system_hosts_desc": "동적 매핑과 사용자 지정 매핑을 시스템 hosts 파일에 함께 기록하여 다른 앱에서도 사용하게 합니다. 일반적으로 켤 필요가 없습니다. 시스템 파일을 수정하므로 관리자 권한이 필요할 수 있으며 앱 종료 시 기록한 매핑을 제거하려고 시도합니다."
+        "write_to_system_hosts_desc": "동적 및 사용자 지정 매핑을 시스템 Hosts에 기록하여 다른 앱에서도 사용하도록 합니다. 보통은 필요하지 않습니다. Windows에서는 관련 설정을 저장하거나 다시 시도할 때 관리자 승인을 요청할 수 있지만, 시작 시 업데이트와 종료 시 정리에서는 요청하지 않습니다. 종료 시 매핑 제거를 시도하지만 권한이 없으면 남을 수 있습니다. 제거하려면 종료 전에 이 옵션을 끄고 저장하세요."
       },
       "panel": {
         "apply_and_save": "설정 적용 및 저장",

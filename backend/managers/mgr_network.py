@@ -1,20 +1,17 @@
 # backend/managers/mgr_network.py
 import os
 import socket
-import atexit
 import copy
-import platform
 import ipaddress
 import json
 import math
 import re
 import time
 import threading
-import tempfile
+import queue
+from dataclasses import asdict
 from contextlib import contextmanager
 from contextvars import ContextVar
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -27,10 +24,11 @@ except ImportError:
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from backend.settings import CACHE_DIR, settings
+from backend.settings import BASE_RESOURCE_DIR, CACHE_DIR, settings
 from backend.utils.error_contract import InvalidResponseError, _classify_http_status, classify_exception
 from backend.utils.json_io import write_json_atomic
 from backend.utils.logger import logger
+from backend.utils.system_hosts import SystemHostsService
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 RimCrow"
 PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy")
@@ -52,6 +50,42 @@ NETWORK_CHECK_TARGETS = (
     ("steam_images_legacy", "Steam 工坊图片（旧版）", "https://steamuserimages-a.akamaihd.net/ugc/781856287315666264/268334829540C1D4FFEEF9924CAB105C60AC4A13/"),
 )
 
+
+def _map_network_tasks(fetch, items: list, stop: threading.Event) -> list:
+    """限量并发并保持输入顺序；退出后不再等待阻塞中的网络 I/O。"""
+    tasks = queue.Queue()
+    completed = queue.Queue()
+    for index, item in enumerate(items):
+        tasks.put((index, item))
+
+    def run():
+        while not stop.is_set():
+            try:
+                index, item = tasks.get_nowait()
+            except queue.Empty:
+                return
+            try:
+                completed.put((index, fetch(item), None))
+            except Exception as exc:
+                completed.put((index, None, exc))
+
+    # requests 无法强制终止线程；daemon 不参与解释器的线程池退出等待。
+    for _ in range(min(4, len(items))):
+        threading.Thread(target=run, name="network-source", daemon=True).start()
+    results = [None] * len(items)
+    remaining = len(items)
+    while remaining and not stop.is_set():
+        try:
+            index, result, error = completed.get(timeout=0.1)
+        except queue.Empty:
+            continue
+        if error is not None:
+            raise error
+        results[index] = result
+        remaining -= 1
+    return results
+
+
 class NetworkManager:
     def __init__(self):
         # 保存原始的 getaddrinfo，防止重复 patch 导致死循环
@@ -61,6 +95,8 @@ class NetworkManager:
         self._dynamic_github_hosts: dict[str, str] = {}
         self._dynamic_github_hosts_source = ""
         self._github_hosts_lock = threading.RLock()
+        self._hosts_cache_thread: threading.Thread | None = None
+        self._hosts_cache_pending = False
         self._github_hosts_stop = threading.Event()
         self._github_hosts_request_id = 0
         self._github_hosts_thread: threading.Thread | None = None
@@ -74,31 +110,27 @@ class NetworkManager:
             "status": "idle", "source_url": "", "hosts": {}, "error": "", "source_errors": [], "updated_at": 0,
         }
         
-        # 定义系统 Hosts 文件路径
-        if platform.system() == "Windows":
-            self.sys_hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
-        else:
-            self.sys_hosts_path = "/etc/hosts"
-            
-        self.marker_start = "# --- RimCrow Hosts Start ---\n"
-        self.marker_end = "# --- RimCrow Hosts End ---\n"
-
-        # 注册退出时的清理函数
-        atexit.register(self._shutdown)
+        self._system_hosts = SystemHostsService(BASE_RESOURCE_DIR / "main.py", self._on_system_hosts_result)
 
         # 首次初始化
         self.apply(startup=True)
 
-    def apply(self, *, startup: bool = False):
+    def apply(self, *, startup: bool = False, allow_system_hosts_elevation: bool = False):
         """应用已保存设置；启动按间隔更新，关闭后重新开启时立即后台获取一次。"""
+        if self._github_hosts_stop.is_set():
+            return
+        source_url = "\n".join(self.split_hosts_sources(settings.config.network.hosts_sources))
+        if startup and settings.config.network.github_hosts_enabled:
+            self._load_github_hosts_cache(source_url)
+        save_cache = False
         with self._github_hosts_lock:
+            if self._github_hosts_stop.is_set():
+                return
             cfg = settings.config.network
             enabled = bool(cfg.github_hosts_enabled)
             was_disabled = self._last_github_hosts_enabled is False and enabled
             source_url = "\n".join(self.split_hosts_sources(cfg.hosts_sources))
             source_changed = self._dynamic_github_hosts_source != source_url
-            if startup and enabled:
-                self._load_github_hosts_cache(source_url)
             if self._dynamic_github_hosts_source != source_url:
                 self._dynamic_github_hosts = {}
             state = self._github_hosts_state
@@ -117,7 +149,7 @@ class NetworkManager:
                 self._dynamic_github_hosts_source = source_url
                 cfg.github_hosts_updated_at = state["updated_at"]
                 self._github_hosts_request_id += 1
-                self._save_github_hosts_cache()
+                save_cache = True
                 self._github_hosts_preview_state = {**preview, "status": "idle", "source_url": "", "hosts": {}}
             if enabled and state["status"] == "ready" and state["source_url"] == source_url:
                 is_new = (self._dynamic_github_hosts != state["hosts"] or self._dynamic_github_hosts_source != source_url
@@ -126,8 +158,8 @@ class NetworkManager:
                 self._dynamic_github_hosts_source = source_url
                 cfg.github_hosts_updated_at = state["updated_at"]
                 if is_new:
-                    self._save_github_hosts_cache()
-            self._apply_hosts()
+                    save_cache = True
+            self._apply_hosts(allow_elevation=allow_system_hosts_elevation)
             is_due = time.time() - float(cfg.github_hosts_updated_at or 0) >= max(1, int(cfg.github_hosts_refresh_interval_hours or 24)) * 3600
             if startup and not self._dynamic_github_hosts:
                 is_due = True  # 无有效缓存视为从未成功获取，不能只凭旧时间戳跳过首次下载。
@@ -140,16 +172,58 @@ class NetworkManager:
             )
             if (enabled and (was_disabled or source_changed) and not has_current_request) or should_fetch:
                 self.refresh_github_hosts()
+        if save_cache:
+            self._save_github_hosts_cache()
 
-    def _apply_hosts(self) -> None:
-        """应用已有映射，不访问网络；调用方持锁，避免后台完成与设置保存同时写入。"""
-        cfg = settings.config.network
-        if getattr(cfg, 'write_to_system_hosts', False):
-            self.write_to_system_hosts()
-        else:
-            self.restore_system_hosts() # 清理可能残留的系统 Hosts
-        # 请求级预览也需要解析覆盖；写入系统成功不能撤掉上下文隔离入口。
-        self.patch_socket_for_hosts()
+    def _apply_hosts(self, *, allow_elevation: bool = False) -> None:
+        """只发布内存状态并提交系统写入目标；不在网络锁内做文件 I/O。"""
+        with self._github_hosts_lock:
+            if self._github_hosts_stop.is_set():
+                return
+            self.patch_socket_for_hosts()
+            hosts = self._effective_hosts() if settings.config.network.write_to_system_hosts else {}
+            self._system_hosts.submit(hosts, allow_elevation=allow_elevation)
+
+    def retry_system_hosts(self) -> dict[str, Any]:
+        """重试已保存的系统映射；不下载来源，不读取表单预览。"""
+        self._apply_hosts(allow_elevation=True)
+        return self.get_github_hosts_status()
+
+    @staticmethod
+    def _system_hosts_message(state: dict[str, Any]) -> str:
+        from backend.i18n.messages import tr
+        if state.get("status") != "error":
+            return ""
+        if state.get("removing"):
+            return tr("network.hosts.system_remove_failed", "系统 Hosts 中可能仍保留之前的映射，请点击重试完成清理。")
+        code = state.get("error_code", "")
+        if code == "NETWORK.HOSTS.ELEVATION_CANCELLED":
+            return tr("network.hosts.authorization_cancelled", "已取消管理员授权，系统 Hosts 未完成更新。应用内映射不受影响。")
+        if code == "NETWORK.HOSTS.AUTHORIZATION_TIMEOUT":
+            return tr("network.hosts.authorization_timeout", "等待管理员授权超时，系统 Hosts 未完成更新。需要时可点击重试。")
+        if code == "NETWORK.HOSTS.PERMISSION_DENIED":
+            if os.name != "nt":
+                return tr("network.hosts.permission_denied_unix", "没有权限更新系统 Hosts，请检查系统文件权限后重试。应用内映射不受影响。")
+            return tr("network.hosts.permission_denied", "没有权限更新系统 Hosts。可点击重试并允许管理员授权，或检查安全软件的拦截设置。")
+        if code == "NETWORK.HOSTS.CONTENT_CHANGED":
+            return tr("network.hosts.content_changed", "检测到其他程序修改了系统 Hosts，请停止同时修改后重试。")
+        if code == "NETWORK.HOSTS.TIMEOUT":
+            return tr("network.hosts.write_timeout", "系统 Hosts 更新超时，结果尚未确认。请点击重试核实并应用已保存的设置。")
+        return tr("network.hosts.system_apply_failed", "系统 Hosts 未能更新，应用内映射仍可使用。请检查系统文件权限或安全软件设置后重试。")
+
+    def _on_system_hosts_result(self, state: dict[str, Any]) -> None:
+        if self._github_hosts_stop.is_set():
+            return  # 退出结果由 close 统一记录，不再派发界面通知。
+        log = logger.warning if state["status"] == "error" else logger.debug
+        log("[SystemHosts] status=%s version=%s duration_ms=%s removing=%s error_code=%s errno=%s winerror=%s detail=%s",
+            state["status"], state["version"], state["duration_ms"], state.get("removing", False), state.get("error_code", ""),
+            state.get("errno"), state.get("winerror"), state.get("error", ""))
+        if state["status"] == "error":
+            from backend.utils.event_bus import EventBus
+            # WebView 通知可能等待界面响应，不能占用系统文件串行执行线程。
+            threading.Thread(target=EventBus.send_toast,
+                args=(self._system_hosts_message(state),),
+                kwargs={"type": "warning", "error_code": state.get("error_code", "")}, name="hosts-notification", daemon=True).start()
 
     @staticmethod
     def _normalize_host(value: Any) -> str:
@@ -489,11 +563,8 @@ class NetworkManager:
         if not targets:
             return {"targets": []}
 
-        results: list[dict[str, Any] | None] = [None] * len(targets)
-        with ThreadPoolExecutor(max_workers=min(4, len(targets)), thread_name_prefix="network-check") as executor:
-            futures = {executor.submit(self._probe_network_target, target, network_override, preview_hosts): index for index, target in enumerate(targets)}
-            for future in as_completed(futures):
-                results[futures[future]] = future.result()
+        stop = getattr(self, "_github_hosts_stop", threading.Event())
+        results = _map_network_tasks(lambda target: self._probe_network_target(target, network_override, preview_hosts), targets, stop)
         return {"targets": [result for result in results if result is not None]}
 
     @staticmethod
@@ -559,14 +630,29 @@ class NetworkManager:
         return list(dict.fromkeys(str(url).strip() for url in rows if str(url).strip()))
 
     def _save_github_hosts_cache(self) -> None:
-        """只持久化已应用的映射，未保存表单的获取结果不得覆盖运行配置的缓存。"""
-        try:
-            write_json_atomic(GITHUB_HOSTS_CACHE_PATH, {
-                "source_url": self._dynamic_github_hosts_source, "hosts": self._dynamic_github_hosts,
-                "updated_at": self._github_hosts_state["updated_at"],
-            })
-        except OSError as exc:
-            logger.warning("动态 Hosts 已应用，但缓存保存失败: %s", exc)
+        """后台持久化正式映射；保存表单不等待缓存磁盘操作。"""
+        with self._github_hosts_lock:
+            if self._github_hosts_stop.is_set():
+                return
+            self._hosts_cache_pending = True
+            if self._hosts_cache_thread is None:
+                self._hosts_cache_thread = threading.Thread(target=self._persist_hosts_cache, name="hosts-cache", daemon=True)
+                self._hosts_cache_thread.start()
+
+    def _persist_hosts_cache(self) -> None:
+        while True:
+            with self._github_hosts_lock:
+                if self._github_hosts_stop.is_set() or not self._hosts_cache_pending:
+                    self._hosts_cache_thread = None
+                    return
+                self._hosts_cache_pending = False
+                payload = {"source_url": self._dynamic_github_hosts_source, "hosts": dict(self._dynamic_github_hosts),
+                           "updated_at": self._github_hosts_state["updated_at"]}
+            try:
+                write_json_atomic(GITHUB_HOSTS_CACHE_PATH, payload)
+            except OSError as exc:
+                if not self._github_hosts_stop.is_set():
+                    logger.warning("动态 Hosts 已应用，但缓存保存失败: %s", exc)
 
     def refresh_github_hosts(self, network_override: dict[str, Any] | None = None) -> dict[str, Any]:
         """后台获取已保存来源或表单预览来源，预览任务与运行态完全隔离。"""
@@ -607,7 +693,8 @@ class NetworkManager:
                 "hosts": {}, "error": "", "source_errors": [], "updated_at": 0,
             })
             thread = threading.Thread(
-                target=self._fetch_github_hosts, args=(request_id, source_url, is_preview, network_override),
+                target=self._fetch_github_hosts, args=(request_id, source_url, is_preview,
+                    network_override if is_preview else {**asdict(cfg), "effective_hosts": self.get_effective_hosts()}),
                 name="dynamic-hosts-preview" if is_preview else "dynamic-hosts", daemon=True,
             )
             setattr(self, thread_attr, thread)
@@ -646,7 +733,8 @@ class NetworkManager:
                     raise ValueError("动态 Hosts 来源没有包含有效映射")
                 return hosts, ""
             except Exception as exc:
-                logger.warning("动态 Hosts 来源获取失败: source=%s, error=%s", source, exc)
+                if not self._github_hosts_stop.is_set() and request_id == getattr(self, request_id_attr):
+                    logger.warning("动态 Hosts 来源获取失败: source=%s, error=%s", source, exc)
                 return {}, "timeout" if isinstance(exc, requests.Timeout) else "failed"
             finally:
                 if response is not None:
@@ -656,13 +744,15 @@ class NetworkManager:
             sources = self.split_hosts_sources(source_url)
             parsed: dict[str, str] = {}
             errors = []
-            with ThreadPoolExecutor(max_workers=min(4, max(1, len(sources))), thread_name_prefix="hosts-source") as executor:
-                # 并行获取但按来源顺序合并，同域名优先使用排在前面的有效来源。
-                for source, (hosts, error) in zip(sources, executor.map(fetch, sources)):
-                    if error:
-                        errors.append({"url": source, "error": error})
-                    for host, address in hosts.items():
-                        parsed.setdefault(host, address)
+            results = _map_network_tasks(fetch, sources, self._github_hosts_stop)
+            if self._github_hosts_stop.is_set():
+                return
+            # 并行获取但按来源顺序合并，同域名优先使用排在前面的有效来源。
+            for source, (hosts, error) in zip(sources, results):
+                if error:
+                    errors.append({"url": source, "error": error})
+                for host, address in hosts.items():
+                    parsed.setdefault(host, address)
             with self._github_hosts_lock:
                 # 来源切换或退出后，旧请求不得覆盖新任务或写入系统文件。
                 if request_id != getattr(self, request_id_attr) or self._github_hosts_stop.is_set():
@@ -684,8 +774,9 @@ class NetworkManager:
                     self._dynamic_github_hosts = dict(parsed)
                     self._dynamic_github_hosts_source = source_url
                     cfg.github_hosts_updated_at = ready_state["updated_at"]
-                    self._save_github_hosts_cache()
                     self._apply_hosts()
+            if can_apply:
+                self._save_github_hosts_cache()
         except Exception as exc:
             error = "timeout" if isinstance(exc, requests.Timeout) else "failed"
             with self._github_hosts_lock:
@@ -715,13 +806,28 @@ class NetworkManager:
                 if cfg.github_hosts_enabled and host not in manual_hosts
             }
             state["cache_path"] = str(GITHUB_HOSTS_CACHE_PATH)
+            state["system_hosts"] = self._system_hosts.status()
+            message = self._system_hosts_message(state["system_hosts"])
+            state["system_hosts"].update(message=str(message), message_key=getattr(message, "message_key", ""))
             return state
 
-    def _shutdown(self) -> None:
+    def close(self) -> None:
+        """显式关闭应用网络；不用于环境切换或数据库重建。"""
+        started_at = time.perf_counter()
+        is_first_close = not self._github_hosts_stop.is_set()
+        if is_first_close:
+            logger.debug("[NetworkShutdown] stage=started")
         self._github_hosts_stop.set()
         with self._github_hosts_lock:
-            self.restore_system_hosts()
+            self._github_hosts_request_id += 1
+            self._github_hosts_preview_request_id += 1
             self.restore_socket_for_hosts()
+        self._system_hosts.close()
+        if is_first_close:
+            system_state = self._system_hosts.status()
+            log = logger.warning if system_state["status"] in {"error", "applying", "authorizing"} else logger.debug
+            log("[NetworkShutdown] stage=finished elapsed_ms=%.2f system_hosts=%s",
+                (time.perf_counter() - started_at) * 1000, system_state)
 
     def _effective_hosts(self) -> dict[str, str]:
         dynamic_hosts = getattr(self, "_dynamic_github_hosts", {}) if getattr(settings.config.network, "github_hosts_enabled", False) else {}
@@ -762,86 +868,6 @@ class NetworkManager:
         self._patched_getaddrinfo = None
         self._is_socket_patched = False
 
-    # ---------------- 系统 Hosts 修改逻辑 ---------------
-    def _write_system_hosts(self, content: str) -> None:
-        """同目录原子替换，避免写入中断破坏原有 Hosts。"""
-        temp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=Path(self.sys_hosts_path).parent,
-                prefix=".rimcrow-hosts-", suffix=".tmp", delete=False,
-            ) as handle:
-                temp_path = handle.name
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(temp_path, os.stat(self.sys_hosts_path).st_mode & 0o777)
-            os.replace(temp_path, self.sys_hosts_path)
-        finally:
-            if temp_path:
-                Path(temp_path).unlink(missing_ok=True)
-
-    def write_to_system_hosts(self) -> bool:
-        """将 Hosts 写入操作系统。返回 True 表示成功，False 表示无权限"""
-        hosts_map = self._effective_hosts()
-        if not hosts_map:
-            self.restore_system_hosts()
-            return True
-        # 构建要写入的文本块
-        block_lines = [self.marker_start]
-        for domain, ip in hosts_map.items():
-            block_lines.append(f"{ip}\t{domain}\n")
-        block_lines.append(self.marker_end)
-        custom_block = "".join(block_lines)
-        try:
-            # 1. 先读取现有内容
-            with open(self.sys_hosts_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-            # 2. 清理掉旧的的标记块
-            content = self._remove_custom_block(content)
-            # 3. 加上新的标记块（确保换行）
-            if not content.endswith('\n'):
-                content += '\n'
-            content += custom_block
-            # 4. 同目录临时文件 + 原子替换，避免进程中断留下半个 Hosts 文件。
-            self._write_system_hosts(content)
-            return True
-
-        except PermissionError:
-            logger.warning("[警告] 无法写入系统 Hosts，请以管理员身份运行。已降级为内部劫持。")
-            return False
-        except Exception as e:
-            logger.error("修改系统 Hosts 失败: %s", e, exc_info=True)
-            return False
-
-    def restore_system_hosts(self):
-        """恢复系统 Hosts（退出时自动调用）"""
-        try:
-            with open(self.sys_hosts_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-            if self.marker_start in content:
-                clean_content = self._remove_custom_block(content)
-                self._write_system_hosts(clean_content)
-        except PermissionError:
-            logger.warning("无法恢复系统 Hosts，权限不足: %s", self.sys_hosts_path)
-        except FileNotFoundError:
-            return
-        except OSError as exc:
-            logger.warning("恢复系统 Hosts 失败: %s", exc, exc_info=True)
-
-    def _remove_custom_block(self, content: str) -> str:
-        """从字符串中安全移除被 Marker 包裹的区域"""
-        markers = (
-            (self.marker_start, self.marker_end),
-            ("# --- RimModManager Hosts Start ---\n", "# --- RimModManager Hosts End ---\n"),
-        )
-        for marker_start, marker_end in markers:
-            start_idx = content.find(marker_start)
-            end_idx = content.find(marker_end)
-            if start_idx != -1 and end_idx != -1:
-                end_idx += len(marker_end)
-                content = content[:start_idx] + content[end_idx:]
-        return content
 
 
 class RoutedSession(requests.Session):

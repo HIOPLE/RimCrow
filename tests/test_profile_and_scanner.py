@@ -3406,6 +3406,34 @@ class TestSettingsPathNormalization(unittest.TestCase):
 
 
 class TestApiSaveSettings(unittest.TestCase):
+    def test_only_hosts_setting_changes_allow_system_authorization(self):
+        from backend.settings import NetworkConfig
+
+        for key, value, expected in (("write_to_system_hosts", True, True), ("hosts", {"example.org": "1.2.3.4"}, True),
+                                     ("github_hosts_auto_update", False, False), ("proxy", {"enabled": True}, False)):
+            api = API.__new__(API)
+            api.active_context = None
+            api.profile_mgr = SimpleNamespace(PROFILE_KEYS=set())
+            api._settings_payload = Mock(return_value={})
+            with self.subTest(key=key), patch.object(settings.config, "network", NetworkConfig()), \
+                    patch.object(settings, "save"), patch("backend.api.network_mgr.apply") as apply:
+                result = api.save_all_settings({"network": {key: value}})
+            self.assertEqual(result["status"], "success")
+            apply.assert_called_once_with(allow_system_hosts_elevation=expected)
+
+    def test_imported_network_settings_never_request_system_authorization(self):
+        api = API.__new__(API)
+        with patch("backend.api.network_mgr.apply") as apply:
+            api._refresh_runtime_after_settings_change({"network"}, import_result={})
+        apply.assert_called_once_with(allow_system_hosts_elevation=False)
+
+    def test_system_hosts_retry_uses_only_saved_target(self):
+        api = API.__new__(API)
+        with patch("backend.api.network_mgr.retry_system_hosts", return_value={"system_hosts": {"status": "applying"}}) as apply:
+            result = api.network_apply_system_hosts()
+        apply.assert_called_once_with()
+        self.assertEqual(result["data"]["system_hosts"]["status"], "applying")
+
     def test_guide_mark_as_done_persists_existing_completed_guides(self):
         original_guides = settings.config.completed_guides
         self.addCleanup(setattr, settings.config, "completed_guides", original_guides)

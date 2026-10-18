@@ -9,6 +9,7 @@ import { useGroupStore } from '../src/features/mod/stores/groupStore.js'
 import { useProfileStore } from '../src/features/profiles/profileStore.js'
 import { useTaskStore } from '../src/app/stores/taskStore.js'
 import { useRuleStore } from '../src/features/rules/ruleStore.js'
+import { toast } from '../src/shared/lib/common.js'
 
 const print = console.log.bind(console)
 console.log = () => {}
@@ -959,7 +960,80 @@ async function testScanTaskDoesNotGuessFailureFromElapsedTime() {
   assert.equal(task.progress, 1)
 }
 
+async function testNetworkSaveClosesPanelBeforeProfileRefreshCompletes() {
+  let release
+  const pending = new Promise(resolve => { release = resolve })
+  resetStores({
+    save_all_settings: async () => ok({ settings: { network: { proxy: { enabled: true } } }, active_context: context() }),
+    profiles_get: () => pending,
+  })
+  const uiState = { showSettingsPanel: true }
+  const actions = createSettingsActions({ uiState })
+  await actions.applySettings({ network: { proxy: { enabled: true } } })
+  assert.equal(uiState.showSettingsPanel, false)
+  release(ok([]))
+}
+
+async function testSettingsNavigationSelectsNetworkWithoutReloadingOpenForm() {
+  const uiState = { showSettingsPanel: false, settingsTab: 'paths' }
+  const actions = createSettingsActions({ uiState })
+  actions.openSettingsPanel('network')
+  assert.equal(uiState.showSettingsPanel, true)
+  assert.equal(uiState.settingsTab, 'network')
+  uiState.settingsTab = 'general'
+  actions.openSettingsPanel('network')
+  assert.equal(uiState.showSettingsPanel, true)
+  assert.equal(uiState.settingsTab, 'network')
+  actions.closeSettingsPanel()
+  actions.openSettingsPanel()
+  assert.equal(uiState.settingsTab, 'paths')
+}
+
+async function testNetworkErrorToastsFromBackendAndUpdateTasks() {
+  resetStores({
+    get_startup_bootstrap: async () => ok({
+      settings: { enable_auto_scan: false, ui: {} },
+      active_context: context({ is_healthy: false }), user_themes: [], upgrade_context: {},
+    }),
+    get_mod_list_core: async () => ok({ groups: [], all_mods: [], active_load_order: [], inactive_load_order: [] }),
+    monitor_frontend_ready: async () => ok(),
+  })
+  const appStore = useAppStore()
+  await appStore.initialize()
+  const originalWarning = toast.warning
+  const originalError = toast.error
+  const captured = []
+  toast.warning = toast.error = content => captured.push(content)
+  try {
+    await window.dispatchEvent({ type: 'backend-popup', detail: {
+      mode: 'toast', type: 'warning', error_code: 'NETWORK.CONNECTION', user_message: '无法连接。',
+    } })
+    assert.equal(captured.at(-1).props.showNetworkSettings, true)
+    await window.dispatchEvent({ type: 'backend-popup', detail: {
+      mode: 'toast', type: 'warning', error_code: 'SYSTEM.PERMISSION', user_message: '权限不足。',
+    } })
+    assert.equal(captured.at(-1), '权限不足。')
+    await window.dispatchEvent({ type: 'global-progress', detail: {
+      id: 'update-failed', type: 'update', status: 'failed', error_code: 'NETWORK.TIMEOUT',
+      user_message: '下载超时。', metrics: {},
+    } })
+    assert.equal(captured.at(-1).props.showNetworkSettings, true)
+    assert.equal(captured.length, 3)
+    await window.dispatchEvent({ type: 'global-progress', detail: {
+      id: 'update-fallback', type: 'update', status: 'failed', error_code: 'NETWORK.TIMEOUT',
+      metrics: { has_fallback_source: true },
+    } })
+    assert.equal(captured.length, 3)
+  } finally {
+    toast.warning = originalWarning
+    toast.error = originalError
+  }
+}
+
 for (const test of [
+  testSettingsNavigationSelectsNetworkWithoutReloadingOpenForm,
+  testNetworkErrorToastsFromBackendAndUpdateTasks,
+  testNetworkSaveClosesPanelBeforeProfileRefreshCompletes,
   testSettingsSourceChangeForcesCoreRefresh,
   testIssueSettingsRefreshModData,
   testWideLanguagePackDetectionRefreshesCore,

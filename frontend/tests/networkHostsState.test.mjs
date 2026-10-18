@@ -14,6 +14,7 @@ const timers = new Map()
 let timerId = 0
 let fetchCount = 0
 let cancelCount = 0
+let systemRetryCount = 0
 let status = {
   status: 'idle', source_url: sourceUrl, dynamic_hosts: { 'saved.example': '1.1.1.1' }, effective_hosts: { 'saved.example': '1.1.1.1' }, can_refresh: false,
   preview: { status: 'idle', source_url: '', hosts: {}, source_errors: [] },
@@ -32,14 +33,20 @@ const api = {
     return { status: 'success', data: status }
   },
   network_github_hosts_status: async () => ({ status: 'success', data: status }),
+  network_apply_system_hosts: async (...args) => {
+    assert.equal(args.length, 0, '系统重试不能把未保存的表单值提交给后端')
+    systemRetryCount += 1
+    status = { ...status, system_hosts: { status: 'authorizing' } }
+    return { status: 'success', data: status }
+  },
 }
 const context = vm.createContext({ computed, ref, watch, props, window: { pywebview: { api } },
   setTimeout: fn => { timers.set(++timerId, fn); return timerId },
   clearTimeout: id => timers.delete(id),
 })
 let scope = effectScope()
-const mount = () => scope.run(() => vm.runInContext('(() => { ' + watcher + '\nglobalThis.controls = { hostsState, hostsRetry } })()', context))
-const settle = async () => { await nextTick(); await Promise.resolve(); await nextTick() }
+const mount = () => scope.run(() => vm.runInContext('(() => { ' + watcher + '\nglobalThis.controls = { hostsState, hostsRetry, systemHostsRetry } })()', context))
+const settle = async () => { await nextTick(); await new Promise(resolve => setImmediate(resolve)); await nextTick() }
 const tick = async () => { const [id, fn] = timers.entries().next().value; timers.delete(id); await fn(); await settle() }
 
 try {
@@ -97,7 +104,72 @@ try {
   assert.deepEqual(Object.keys(props.formData.network).sort(), ['github_hosts_enabled', 'hosts_sources'])
   scope.stop()
   assert.equal(timers.size, 0)
+
+  // 系统写入与动态来源获取独立，即使关闭动态 Hosts 也要显示系统操作结果。
+  status = { ...status, system_hosts: { status: 'applying' } }
+  scope = effectScope()
+  mount()
+  await settle()
+  assert.equal(context.controls.hostsState.value.system_hosts.status, 'applying')
+  assert.equal(timers.size, 1)
+  status = { ...status, system_hosts: { status: 'authorizing' } }
+  await tick()
+  assert.equal(context.controls.hostsState.value.system_hosts.status, 'authorizing')
+  assert.equal(timers.size, 1, '等待授权期间应继续查询系统状态')
+  status = { ...status, system_hosts: { status: 'error', error_code: 'NETWORK.HOSTS.PERMISSION_DENIED' } }
+  await tick()
+  assert.equal(context.controls.hostsState.value.system_hosts.status, 'error')
+  assert.equal(timers.size, 0)
+  const previousFetchCount = fetchCount
+  context.controls.systemHostsRetry.value += 1
+  await settle()
+  assert.equal(systemRetryCount, 1)
+  assert.equal(fetchCount, previousFetchCount, '系统写入重试不应重新下载或应用预览 Hosts')
+  status = { ...status, system_hosts: { status: 'removed' } }
+  await tick()
+  assert.equal(timers.size, 0)
+  scope.stop()
+
+  let releaseStatus
+  let requests = 0
+  api.network_github_hosts_status = () => {
+    requests += 1
+    return new Promise(resolve => { releaseStatus = () => resolve({ status: 'success', data: status }) })
+  }
+  scope = effectScope()
+  mount()
+  await settle()
+  assert.equal(requests, 1)
+  props.formData.network.proxy = { enabled: true }
+  await settle()
+  assert.equal(requests, 1, '前一次状态请求未返回时不得叠加查询')
+  scope.stop()
+  releaseStatus()
+  await settle()
+  assert.equal(requests, 1, '卸载后不得执行排队的旧查询')
 } finally {
   scope.stop()
 }
+
+const toolsStart = source.indexOf('<section aria-labelledby="network-community-tools-title"')
+assert.ok(toolsStart >= 0)
+const toolsTemplate = source.slice(toolsStart, source.indexOf('</section>', toolsStart) + '</section>'.length)
+const openedUrls = []
+const renderTools = require('vue').compile(toolsTemplate, { isCustomElement: tag => tag === 'ExternalLink' })
+const tools = renderTools({ t: (_key, fallback) => fallback, appStore: { openUrl: url => openedUrls.push(url) } }, [])
+const links = []
+const visit = node => {
+  if (node?.type === 'a') links.push(node)
+  if (Array.isArray(node?.children)) node.children.forEach(visit)
+}
+visit(tools)
+assert.deepEqual(links.map(link => link.props.href), ['https://steampp.net/', 'https://www.dogfight360.com/blog/18682/'])
+for (const link of links) {
+  assert.equal(link.props.target, '_blank')
+  assert.equal(link.props.rel, 'noopener noreferrer')
+  let prevented = false
+  link.props.onClick({ preventDefault: () => { prevented = true } })
+  assert.ok(prevented, '卡片点击应使用已有的网址打开逻辑，不能替换设置页面')
+}
+assert.deepEqual(openedUrls, links.map(link => link.props.href))
 console.log('动态 Hosts 界面状态测试通过。')

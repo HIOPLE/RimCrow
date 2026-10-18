@@ -54,6 +54,7 @@ export const useAppStore = defineStore('app', () => {
   // UI 状态
   const uiState = reactive({
     showSettingsPanel: false,    // 是否显示设置面板
+    settingsTab: 'paths',        // 设置面板当前页面，也供外部操作直接跳转
     showUpdateModal: false,      // 是否显示更新弹窗
     showDiffDrawer: false,       // 是否显示差异抽屉
     showLogDrawer: false,        // 是否显示日志抽屉
@@ -1788,7 +1789,7 @@ export const useAppStore = defineStore('app', () => {
     // 模式1: 轻提示 (Toast)
     if (mode === 'toast') {
       const toastType = type || 'info' // success, error, warning, info
-      if (type === 'error' || event.detail?.error_id) {
+      if (type === 'error' || type === 'warning' || event.detail?.error_id) {
         showUserErrorToast({ ...event.detail, user_message: popupMessage }, popupMessage, {
           variant: toastType,
           timeout: duration || 3000,

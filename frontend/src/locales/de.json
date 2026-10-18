@@ -4285,6 +4285,18 @@
       "import_success": "Import erfolgreich"
     }
   },
+  "network": {
+    "hosts": {
+      "authorization_cancelled": "Die Administratorfreigabe wurde abgebrochen. Die System-Hosts-Datei wurde nicht aktualisiert. App-interne Zuordnungen bleiben unverändert.",
+      "authorization_timeout": "Zeitüberschreitung beim Warten auf die Administratorfreigabe. Die System-Hosts-Datei wurde nicht aktualisiert. Bei Bedarf erneut versuchen.",
+      "content_changed": "Ein anderes Programm hat die System-Hosts-Datei geändert. Gleichzeitige Änderungen beenden und erneut versuchen.",
+      "permission_denied": "Keine Berechtigung zum Aktualisieren der System-Hosts-Datei. Erneut versuchen und die Administratorfreigabe bestätigen oder die Sicherheitssoftware prüfen.",
+      "permission_denied_unix": "Keine Berechtigung zum Aktualisieren der System-Hosts-Datei. Dateiberechtigungen prüfen und erneut versuchen. App-interne Zuordnungen bleiben unverändert.",
+      "system_apply_failed": "Die System-Hosts-Datei konnte nicht aktualisiert werden. App-interne Zuordnungen bleiben verfügbar. Dateiberechtigungen oder Sicherheitssoftware prüfen und erneut versuchen.",
+      "system_remove_failed": "Bisherige Zuordnungen können in der System-Hosts-Datei verblieben sein. Erneut versuchen, um sie zu entfernen.",
+      "write_timeout": "Zeitüberschreitung beim Aktualisieren der System-Hosts-Datei; das Ergebnis ist unbestätigt. Erneut versuchen, um den Zustand zu prüfen und die gespeicherten Einstellungen anzuwenden."
+    }
+  },
   "secret": {
     "errors": {
       "backend_unavailable": "Der Speicher für Systemanmeldeinformationen ist nicht verfügbar",
@@ -4578,7 +4590,9 @@
   "toast": {
     "api": {
       "error": "{workname} fehlgeschlagen:\n{message}",
+      "network_advice": "Bei instabiler Verbindung kannst du unter „Netzwerk“ die Verbindungseinstellungen anpassen oder die empfohlenen Netzwerktools ansehen.",
       "open_corresponding_log": "Zugehöriges Systemlog anzeigen",
+      "open_network_settings": "Netzwerkeinstellungen öffnen",
       "success": "{workname} abgeschlossen",
       "warning": "{workname} braucht Aufmerksamkeit:\n{message}"
     },
@@ -4912,7 +4926,6 @@
       "install_cancelled": "Update-Installation abgebrochen.",
       "partial_no_update": "Einige Update-Quellen sind nicht verfügbar. Aus den verfügbaren Quellen wurde keine neue Version gefunden.",
       "recommend_scan": "Führen Sie einen vollständigen Scan durch, um die Kernfunktionen der neuen Version zu übernehmen.",
-      "start_failed": "Update konnte nicht gestartet werden. Prüfen Sie Netzwerkverbindung, Proxy-Einstellungen und Rechte des Installationsordners.",
       "up_to_date": "Sie sind bereits auf der neuesten Version."
     },
     "workspace": {
@@ -6429,6 +6442,8 @@
         "unbound": "Ungebunden"
       },
       "network": {
+        "community_tools_help": "Diese Tools werden unabhängig von der Community gepflegt. Laden Sie sie selbst herunter und aktivieren Sie sie gemäß ihrer Anleitung. Verwenden Sie zunächst nur eines, um Konflikte zu vermeiden.",
+        "community_tools_title": "Netzwerktools aus der Community",
         "custom_hosts": "Benutzerdefinierte Hosts-Zuordnung",
         "custom_hosts_desc": "Legt die IP-Adresse einer Domain manuell fest. Normalerweise sind keine Änderungen nötig; verwenden Sie dies nur, wenn Sie die Zieladresse kennen.",
         "dynamic_mirrors_enabled": "[UNTRANSLATED] 启用动态镜像节点",
@@ -6537,6 +6552,11 @@
         "steam_web_api_key_placeholder": "Aktiviert die erweiterte Suche, wenn es ausgefüllt ist",
         "steam_web_api_key_risk": "Jeder, der diesen Schlüssel erhält, kann die echten Trades eines Spielers stillschweigend stornieren, ohne den Steam Guard auszulösen, und sie durch gefälschte Trades ersetzen, die an einen Betrüger gesendet werden. Teilen Sie Ihren API-Schlüssel niemals mit irgendjemandem oder einer nicht verifizierten Website Dritter.",
         "steam_web_api_key_warning": "Warnung: Ihr API-Schlüssel ist praktisch ein Hintertürschlüssel zu Ihrem Steam-Konto. Es kann öffentliche Kontodaten/Bestandsinformationen lesen und Handelsangebote verwalten oder anhören.",
+        "steamcommunity302_description": "Hilft bei Verbindungsproblemen mit Steam Community, Workshop und ähnlichen Seiten. Einen Versuch wert, wenn Seiten nicht öffnen oder Bilder nicht laden.",
+        "steampp_description": "Verbessert den Zugriff auf Steam Community, Workshop und weitere Websites und bietet zusätzliche Steam-Funktionen wie den Kontowechsel.",
+        "system_hosts_applying": "System-Hosts werden aktualisiert.",
+        "system_hosts_authorizing": "Warten auf Administratorfreigabe. Bitte den Systemdialog beachten. Einstellungen können weiterhin gespeichert werden.",
+        "system_hosts_retry": "Gespeicherte System-Hosts-Einstellungen erneut anwenden",
         "title": "Netzwerkprotokoll und Proxy",
         "use_proxy_on_ai": "Verwenden Sie einen Proxy für KI-Anfragen",
         "use_proxy_on_ai_desc": "Wenn diese Option aktiviert ist, laufen AI-Anfragen über den Proxyserver. Aktivieren Sie dies nicht, wenn der konfigurierte Endpunkt bereits ein lokaler/inländischer Proxy ist.",
@@ -6544,8 +6564,9 @@
         "use_proxy_on_steamcmd_desc": "Ob SteamCMD den Proxyserver verwendet.\n\nWenn diese Option aktiviert ist, laufen die Download-, Aktualisierungs- und Installationsvorgänge von SteamCMD über den Proxyserver.",
         "username": "Benutzername",
         "visit": "Besuchen",
+        "visit_tool_website": "Tool-Website besuchen",
         "write_to_system_hosts": "Hosts-Zuordnungen systemweit anwenden",
-        "write_to_system_hosts_desc": "Schreibt dynamische und benutzerdefinierte Zuordnungen in die System-Hosts-Datei, damit andere Programme sie nutzen können. Normalerweise nicht nötig; ändert eine Systemdatei und erfordert möglicherweise Administratorrechte. Beim Beenden versucht die App, ihre Zuordnungen zu entfernen."
+        "write_to_system_hosts_desc": "Dynamische und eigene Zuordnungen in die System-Hosts-Datei schreiben, damit andere Apps sie nutzen können. Normalerweise nicht nötig. Unter Windows kann beim Speichern relevanter Einstellungen oder beim erneuten Versuch eine Administratorfreigabe angefordert werden; beim Start und Beenden erfolgt keine Abfrage. Beim Beenden werden die Zuordnungen nach Möglichkeit entfernt. Ohne Berechtigung können sie verbleiben. Zum Entfernen diese Option vor dem Beenden ausschalten und speichern."
       },
       "panel": {
         "apply_and_save": "Einstellungen übernehmen und speichern",

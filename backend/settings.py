@@ -1,6 +1,7 @@
 # backend/settings.py
 
 import json
+import locale
 import os
 import platform
 import re
@@ -70,6 +71,35 @@ COMMUNITY_INSTEAD_DB_PATH = DATA_DIR / "replacements.json.gz"  # 替代Mod数据
 MULTIPLAYER_COMPAT_DB_PATH = DATA_DIR / "multiplayerCompatibility.json"  # Multiplayer 官方兼容表
 MP_COMPAT_PACKAGE_IDS_PATH = DATA_DIR / "mpCompatPackageIds.json"         # Multiplayer Compatibility 适配包名表
 GIT_PROVIDER_CATALOG_DIR = DATA_DIR / "git_catalogs"  # Git 推荐清单缓存目录
+
+
+_BUILTIN_UI_LANGUAGE_CODES = {"zh-CN", "zh-TW", "en", "de", "ko", "ru"}
+
+
+def _detect_initial_language() -> str:
+    """首次创建配置时匹配内置界面语言；不支持或读取失败时使用英语。"""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            # 界面语言与地区格式可能不同，不能用 Windows 的区域设置代替。
+            language = locale.windows_locale.get(ctypes.windll.kernel32.GetUserDefaultUILanguage(), "")
+        else:
+            language = (os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES")
+                        or os.environ.get("LANG") or locale.getlocale()[0] or "")
+    except (AttributeError, OSError, ValueError):
+        return "en"
+
+    code = normalize_language_code(language.split(".", 1)[0].split("@", 1)[0])
+    parts = code.lower().split("-")
+    if parts[0] == "zh":
+        if "hans" in parts:
+            code = "zh-CN"
+        else:
+            code = "zh-TW" if "hant" in parts or any(region in parts for region in ("tw", "hk", "mo")) else "zh-CN"
+    elif code not in _BUILTIN_UI_LANGUAGE_CODES:
+        code = parts[0]
+    return code if code in _BUILTIN_UI_LANGUAGE_CODES else "en"
 
 
 def normalize_github_mirrors(raw: Any, *, strict: bool = False) -> list[dict[str, Any]]:
@@ -158,7 +188,7 @@ class NetworkConfig:
     hosts: Dict[str, str] = field(default_factory=dict) 
     write_to_system_hosts: bool = False         # 是否将自定义 Hosts 写入系统 hosts 文件
     github_hosts_enabled: bool = False          # 是否启用动态 Hosts 来源中的完整有效映射
-    github_hosts_auto_update: bool = False      # 是否启动时按间隔自动刷新动态 Hosts
+    github_hosts_auto_update: bool = True       # 是否启动时按间隔自动刷新动态 Hosts
     hosts_sources: list[dict[str, Any]] = field(default_factory=lambda: [
         {"url": "https://raw.hellogithub.com/hosts", "enabled": True},
         {"url": "https://cdn.jsdelivr.net/gh/Clov614/SteamHostSync@main/Hosts_steam", "enabled": True},
@@ -634,6 +664,8 @@ class SettingsManager:
         backup_fragment = self._read_config_fragment(CONFIG_UPDATE_BACKUP_PATH, "update-backup")
 
         if current_fragment is None and backup_fragment is None:
+            self.config.language = _detect_initial_language()
+            self.config.network.github_hosts_enabled = self.config.language == "zh-CN"
             self._normalize_config()
             self._sync_derived_paths()
             return
@@ -712,7 +744,7 @@ class SettingsManager:
             if isinstance(row, dict)
         ]
         self.config.network.github_hosts_enabled = bool(getattr(self.config.network, "github_hosts_enabled", False))
-        self.config.network.github_hosts_auto_update = bool(getattr(self.config.network, "github_hosts_auto_update", False))
+        self.config.network.github_hosts_auto_update = bool(getattr(self.config.network, "github_hosts_auto_update", True))
         try:
             self.config.network.github_hosts_refresh_interval_hours = max(
                 1, min(24 * 30, int(getattr(self.config.network, "github_hosts_refresh_interval_hours", 24) or 24))

@@ -460,6 +460,8 @@ const handleOpenSystemLogTarget = (event) => {
   appStore.uiState.showLogDrawer = true
 }
 
+const handleOpenNetworkSettings = () => appStore.openSettingsPanel('network')
+
 const closeThemeEditor = () => {
   appStore.themeEditor.isOpen = false
   appStore.themeEditor.theme = null
@@ -582,6 +584,7 @@ onMounted(() => {
   startupPerfMark('app_mounted')
   stopKeybindingRuntime = startKeybindingRuntime({ commandStore })
   window.addEventListener('rimcrow-open-system-log-target', handleOpenSystemLogTarget)
+  window.addEventListener('rimcrow-open-network-settings', handleOpenNetworkSettings)
   // 确保数据初始化
   appStore.initialize()
   // 监听后端传递过来的升级上下文
@@ -621,6 +624,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('rimcrow-open-system-log-target', handleOpenSystemLogTarget)
+  window.removeEventListener('rimcrow-open-network-settings', handleOpenNetworkSettings)
   if (stopKeybindingRuntime) stopKeybindingRuntime()
   orderStore.saveInactiveOrder();  // 退出前先保存停用列表顺序
   if (resizeObserver) resizeObserver.disconnect()

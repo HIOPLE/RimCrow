@@ -141,7 +141,10 @@ const appStore = useAppStore()
 const profileStore = useProfileStore()
 
 // 设置面板只编辑本地副本，保存时再交给 store 统一提交。
-const currentTab = ref('paths')
+const currentTab = computed({
+  get: () => appStore.uiState.settingsTab,
+  set: (tab) => { appStore.uiState.settingsTab = tab },
+})
 const formData = ref({})
 const saving = ref(false)
 

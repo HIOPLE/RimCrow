@@ -778,6 +778,11 @@ class API:
         return ApiResponse.success(network_mgr.get_github_hosts_status())
 
     @log_api_call
+    def network_apply_system_hosts(self):
+        """仅重试已保存的系统映射目标，不下载来源，也不采用未保存的表单值。"""
+        return ApiResponse.success(network_mgr.retry_system_hosts())
+
+    @log_api_call
     def network_check_access(self, settings_override: dict | None = None):
         """检测常用网络服务；传入设置页表单值时只临时用于本次检测，不保存。"""
         override = dict(settings_override) if isinstance(settings_override, dict) else {}
@@ -803,10 +808,10 @@ class API:
     def _changed_settings_keys(before_state: dict[str, Any], after_state: dict[str, Any], keys) -> set[str]:
         return {key for key in keys if before_state.get(key) != after_state.get(key)}
 
-    def _refresh_runtime_after_settings_change(self, changed_global_keys: set[str], *, env_changed: bool = False, profile_id: str = "", import_result: dict[str, Any] | None = None) -> bool:
+    def _refresh_runtime_after_settings_change(self, changed_global_keys: set[str], *, env_changed: bool = False, profile_id: str = "", import_result: dict[str, Any] | None = None, allow_system_hosts_elevation: bool = False) -> bool:
         """按真实变化刷新运行态，避免仅保存同值时重载管理器。"""
         if "network" in changed_global_keys:
-            network_mgr.apply()
+            network_mgr.apply(allow_system_hosts_elevation=allow_system_hosts_elevation)
 
         current_reloaded = False
         target_profile_id = str(profile_id or settings.config.current_profile_id or "").strip()
@@ -2492,6 +2497,8 @@ class API:
         1. 识别环境字段 -> 更新 DB -> 重建 Context
         2. 识别全局字段 -> 更新 settings.config -> 保存 JSON
         """
+        started_at = time.perf_counter()
+        logger.debug("[SettingsSave] stage=started")
         try:
             def _to_plain(value):
                 if is_dataclass(value) and not isinstance(value, type):
@@ -2579,7 +2586,16 @@ class API:
             else:
                 normalization_warnings = []
                 changed_global_keys = set()
-            self._refresh_runtime_after_settings_change(changed_global_keys, env_changed=env_changed, profile_id=pid)
+            logger.debug("[SettingsSave] stage=persisted elapsed_ms=%.2f changed_keys=%s env_changed=%s",
+                         (time.perf_counter() - started_at) * 1000, sorted(changed_global_keys), env_changed)
+            hosts_keys = ("hosts", "github_hosts_enabled", "hosts_sources", "write_to_system_hosts")
+            allow_hosts_elevation = "network" in changed_global_keys and any(
+                before_state["network"].get(key) != after_state["network"].get(key) for key in hosts_keys
+            )
+            self._refresh_runtime_after_settings_change(changed_global_keys, env_changed=env_changed, profile_id=pid,
+                                                        allow_system_hosts_elevation=allow_hosts_elevation)
+            logger.debug("[SettingsSave] stage=runtime_applied elapsed_ms=%.2f network_changed=%s",
+                         (time.perf_counter() - started_at) * 1000, "network" in changed_global_keys)
             if normalization_warnings:
                 localized_warnings = [self._localized_settings_warning(item) for item in normalization_warnings]
                 message = localized_warnings[0] if len(localized_warnings) == 1 else "\n".join(str(item) for item in localized_warnings)

@@ -1,4 +1,4 @@
-import { toast, checkResult, showUserErrorToast } from '../../../shared/lib/common'
+import { toast, checkResult } from '../../../shared/lib/common'
 import { useConfirmStore } from '../../../shared/components/modal/confirmStore'
 import { usePromptQueueStore } from '../../../features/ai/promptQueueStore'
 import { t } from '../../../shared/i18n.js'
@@ -160,8 +160,6 @@ export const useUpdateActions = ({
       if (res.data && res.data.status === 'downloading') {
         toast.info(t('toast.update.download_started', '已开始下载更新包，请留意底部状态栏。'))
       }
-    } else {
-      showUserErrorToast(res, t('toast.update.start_failed', '启动更新失败。请检查网络连接、代理设置和安装目录权限。'))
     }
   }
 

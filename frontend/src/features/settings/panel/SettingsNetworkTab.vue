@@ -16,7 +16,7 @@
         <table class="network-check-table w-full table-auto text-xs border-separate border-spacing-x-3 border-spacing-y-1.5">
           <colgroup><col class="network-check-fit-col" /><col class="network-check-domain-col" /><col class="network-check-fit-col" /><col class="network-check-fit-col" /></colgroup>
           <thead class="text-text-dim">
-            <tr>
+            <tr class="text-accent-primary">
               <th scope="col" class="text-left whitespace-nowrap font-normal">{{ t('ui.settings.network.network_check_name', '名称') }}</th>
               <th scope="col" class="text-left font-normal">{{ t('ui.settings.network.network_check_domain', '域名') }}</th>
               <th scope="col" class="text-right whitespace-nowrap font-normal">{{ t('ui.settings.network.network_check_latency', '延时') }}</th>
@@ -126,9 +126,16 @@
           <p v-else class="mt-3 text-xs text-text-dim">{{ t('ui.settings.network.effective_hosts_empty', '当前没有生效的动态 Hosts 映射。') }}</p>
           <p class="mt-2 text-[0.7rem] text-text-dim break-all">{{ t('ui.settings.network.effective_hosts_desc', '只读显示动态 Hosts；缓存文件：') }} {{ hostsState.cache_path || 'data/cache/github_hosts.json' }}</p>
         </details>
-        <CommonSwitch :label="t('ui.settings.network.write_to_system_hosts', '将 Hosts 映射应用到系统')" v-model="formData.network.write_to_system_hosts" :description="t('ui.settings.network.write_to_system_hosts_desc', '将动态和自定义映射一起写入系统 hosts 文件，让其他软件也能使用。通常无需开启；此操作会修改系统文件，可能需要管理员权限，退出软件时会尝试移除写入的映射。')" />
+        <CommonSwitch :label="t('ui.settings.network.write_to_system_hosts', '将 Hosts 映射应用到系统')" v-model="formData.network.write_to_system_hosts" :description="t('ui.settings.network.write_to_system_hosts_desc', '将动态和自定义映射写入系统 Hosts，让其他软件也能使用，通常无需开启。保存相关设置或点击重试时，Windows 可能请求管理员授权；启动更新和退出清理不会弹出授权窗口。退出时会尝试移除映射，无权清理时可能保留，请在退出前关闭此项并保存。')" />
+        <p v-if="hostsState.system_hosts?.status === 'authorizing'" class="text-xs text-text-dim px-4" role="status">{{ t('ui.settings.network.system_hosts_authorizing', '正在等待管理员授权，请留意系统授权窗口。不影响设置保存。') }}</p>
+        <p v-else-if="hostsState.system_hosts?.status === 'applying'" class="text-xs text-text-dim px-4" role="status">{{ t('ui.settings.network.system_hosts_applying', '正在更新系统 Hosts') }}</p>
+        <div v-else-if="hostsState.system_hosts?.status === 'error'" class="text-xs text-accent-warn px-4 space-y-1" role="alert">
+          <p>{{ t(hostsState.system_hosts.message_key, hostsState.system_hosts.message) }}</p>
+          <button type="button" class="underline py-1" @click="systemHostsRetry += 1">{{ t('ui.settings.network.system_hosts_retry', '重试已保存的系统 Hosts 设置') }}</button>
+        </div>
         <p class="text-xs text-text-dim px-2">{{ t('ui.settings.network.hosts_priority', '同一域名同时出现在动态和自定义映射中时，优先使用自定义映射。') }}</p>
       </div>
+      
     
       <div class="modal-section space-y-4 p-4">
         <CommonSwitch :label="t('ui.settings.network.enable_steam_enhanced_api', '启用工坊增强信息')" v-model="formData.enable_steam_enhanced_api" mini :description="t('ui.settings.network.enable_steam_enhanced_api_desc', '开启并填写 Key 后，工坊页会优先使用在线增强信息；没有 Key 或关闭此项时会自动使用本地缓存搜索。')" />
@@ -152,7 +159,36 @@
           <p>{{ t('ui.settings.network.steam_web_api_key_risk', '任何人一旦获取了此 Key，就可以在不触发 Steam 令牌的情况下，暗中取消玩家的真实交易，并替换为发给骗子的假交易。绝对不要将 API 密钥分享给任何人或任何未经验证的第三方网站。') }}</p>
         </div>
       </div>
-
+      <section aria-labelledby="network-community-tools-title" class="modal-section space-y-3 p-4">
+        <h4 id="network-community-tools-title" class="text-sm font-bold text-text-main">{{ t('ui.settings.network.community_tools_title', '社区网络工具推荐') }}</h4>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <a href="https://steampp.net/" target="_blank" rel="noopener noreferrer" @click.prevent="appStore.openUrl('https://steampp.net/')"
+            class="group flex min-w-0 flex-col gap-2 rounded-xl border border-border-base/10 bg-bg-inset/30 p-4 transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary">
+            <span class="flex items-center justify-between gap-2 text-sm font-bold text-text-main">
+              Watt Toolkit (Steam++)
+              <ExternalLink class="size-4 shrink-0 text-text-dim group-hover:text-accent-primary" aria-hidden="true" />
+            </span>
+            <p class="text-xs leading-relaxed text-text-dim">{{ t('ui.settings.network.steampp_description', '为 Steam 社区、创意工坊等网站提供访问加速，并集成账号切换等 Steam 实用工具。') }}</p>
+            <span class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
+              <span class="text-text-dim">steampp.net</span>
+              <span class="font-bold text-accent-primary">{{ t('ui.settings.network.visit_tool_website', '访问工具网页') }}</span>
+            </span>
+          </a>
+          <a href="https://www.dogfight360.com/blog/18682/" target="_blank" rel="noopener noreferrer" @click.prevent="appStore.openUrl('https://www.dogfight360.com/blog/18682/')"
+            class="group flex min-w-0 flex-col gap-2 rounded-xl border border-border-base/10 bg-bg-inset/30 p-4 transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary">
+            <span class="flex items-center justify-between gap-2 text-sm font-bold text-text-main">
+              Steamcommunity 302
+              <ExternalLink class="size-4 shrink-0 text-text-dim group-hover:text-accent-primary" aria-hidden="true" />
+            </span>
+            <p class="text-xs leading-relaxed text-text-dim">{{ t('ui.settings.network.steamcommunity302_description', '改善 Steam 社区、创意工坊等页面的连接问题，遇到网页打不开或图片加载异常时可以尝试。') }}</p>
+            <span class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
+              <span class="text-text-dim">dogfight360.com</span>
+              <span class="font-bold text-accent-primary">{{ t('ui.settings.network.visit_tool_website', '访问工具网页') }}</span>
+            </span>
+          </a>
+        </div>
+        <p class="text-xs leading-relaxed text-text-dim">{{ t('ui.settings.network.community_tools_help', '以上工具由社区独立维护，需自行下载并按工具说明启用。建议先使用一种，避免多个加速工具同时开启造成冲突。') }}</p>
+      </section>
     </div>
   </section>
   <CommonModalShell :show="!!mirrorDraft" :title="t('ui.settings.network.mirror_editor', '编辑 GitHub 镜像源')" size="compact" :z-index="UI_Z_INDEX.SECONDARY_MODAL" content-class="overflow-y-auto" @close="mirrorDraft = null">
@@ -183,6 +219,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ExternalLink, FolderOpen, Link, LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { useAppStore } from '../../../app/stores/appStore'
 import CommonSwitch from '../../../shared/components/input/CommonSwitch.vue'
 import CommonInput from '../../../shared/components/input/CommonInput.vue'
 import CommonSecretInput from '../../../shared/components/input/CommonSecretInput.vue'
@@ -204,6 +241,7 @@ const props = defineProps({
 
 defineEmits(['preserve-secret', 'clear-secret'])
 
+const appStore = useAppStore()
 const proxyTypeOptions = computed(() => [
   { label: 'HTTP', value: 'http' },
   { label: 'SOCKS5', value: 'socks5' },
@@ -448,6 +486,8 @@ const handleOpenMirrorsFile = async () => {
 
 const hostsState = ref({ status: 'idle' })
 const hostsRetry = ref(0)
+const systemHostsRetry = ref(0)
+let hostsRequest = Promise.resolve()
 const hostsSources = computed(() => props.formData.network.hosts_sources || [])
 const activeHostsSources = computed(() => [...new Set(hostsSources.value.filter(row => row.enabled).map(row => row.url.trim()).filter(Boolean))].join('\n'))
 
@@ -463,6 +503,7 @@ const selectHostsState = (state, sourceUrl) => {
     dynamic_hosts: runtime.dynamic_hosts || {},
     effective_hosts: runtime.effective_hosts || {},
     cache_path: runtime.cache_path,
+    system_hosts: runtime.system_hosts,
     is_applied: !!runtime.is_applied,
   }
 }
@@ -473,6 +514,7 @@ watch([
   () => activeHostsSources.value,
   hostsRetry,
   () => JSON.stringify({ proxy: props.formData.network.proxy, hosts: props.formData.network.hosts }),
+  systemHostsRetry,
 ], ([enabled, sourceUrl, retry, networkSnapshot], previous, onCleanup) => {
   let isActive = true
   let timer = null
@@ -482,20 +524,26 @@ watch([
   })
   const shouldRefresh = enabled && previous?.length > 0 && (!previous[0] || sourceUrl !== previous[1] || retry !== previous[2] || networkSnapshot !== previous[3])
   const shouldCancel = !enabled && previous?.[0]
+  const shouldRetrySystem = previous?.length > 0 && systemHostsRetry.value !== previous[4]
   hostsState.value = { ...hostsState.value, status: shouldRefresh ? 'loading' : 'idle', is_applied: false }
   const load = async (isInitial) => {
     try {
       const api = window.pywebview?.api
       if (!api) throw new Error('Network API unavailable')
-      const result = isInitial && (shouldRefresh || shouldCancel)
-        ? await api.network_refresh_github_hosts({
+      const payload = isInitial && (shouldRefresh || shouldCancel) ? {
             github_hosts_enabled: enabled,
             hosts_sources: hostsSources.value.map(row => ({ ...row })),
             proxy: { ...(props.formData.network?.proxy || {}) },
             hosts: { ...(props.formData.network?.hosts || {}) },
             _preserve_secret_keys: Array.isArray(props.formData._preserve_secret_keys) ? [...props.formData._preserve_secret_keys] : [],
-          })
-        : await api.network_github_hosts_status()
+          } : null
+      // 表单切换会作废旧 watcher；串行处理，避免慢响应期间堆积查询线程。
+      hostsRequest = hostsRequest.catch(() => {}).then(() => {
+        if (!isActive) return null
+        if (isInitial && shouldRetrySystem) return api.network_apply_system_hosts()
+        return payload ? api.network_refresh_github_hosts(payload) : api.network_github_hosts_status()
+      })
+      const result = await hostsRequest
       if (!isActive) return
       if (result?.status !== 'success') throw new Error('Hosts request failed')
       const state = result.data
@@ -503,10 +551,11 @@ watch([
       // 只展示当前来源的任务结果，已生效映射由后端单独返回。
       if (!enabled || displayState.source_url !== sourceUrl) {
         hostsState.value = { ...displayState, status: 'idle', can_refresh: false, is_applied: false }
+        if (['applying', 'authorizing'].includes(displayState.system_hosts?.status)) timer = setTimeout(() => load(false), 800)
         return
       }
       hostsState.value = displayState
-      if (enabled && displayState.status === 'loading') timer = setTimeout(() => load(false), 800)
+      if ((enabled && displayState.status === 'loading') || ['applying', 'authorizing'].includes(displayState.system_hosts?.status)) timer = setTimeout(() => load(false), 800)
     } catch {
       if (isActive) hostsState.value = { ...hostsState.value, status: 'error', error: 'failed' }
     }

@@ -4285,6 +4285,18 @@
       "import_success": "导入成功"
     }
   },
+  "network": {
+    "hosts": {
+      "authorization_cancelled": "已取消管理员授权，系统 Hosts 未完成更新。应用内映射不受影响。",
+      "authorization_timeout": "等待管理员授权超时，系统 Hosts 未完成更新。需要时可点击重试。",
+      "content_changed": "检测到其他程序修改了系统 Hosts，请停止同时修改后重试。",
+      "permission_denied": "没有权限更新系统 Hosts。可点击重试并允许管理员授权，或检查安全软件的拦截设置。",
+      "permission_denied_unix": "没有权限更新系统 Hosts，请检查系统文件权限后重试。应用内映射不受影响。",
+      "system_apply_failed": "系统 Hosts 未能更新，应用内映射仍可使用。请检查系统文件权限或安全软件设置后重试。",
+      "system_remove_failed": "系统 Hosts 中可能仍保留之前的映射，请点击重试完成清理。",
+      "write_timeout": "系统 Hosts 更新超时，结果尚未确认。请点击重试核实并应用已保存的设置。"
+    }
+  },
   "secret": {
     "errors": {
       "backend_unavailable": "系统凭据库不可用",
@@ -4578,7 +4590,9 @@
   "toast": {
     "api": {
       "error": "{workname}失败：\n{message}",
+      "network_advice": "连接不稳定时，可前往“网络连接”调整网络设置，或查看推荐的网络优化工具。",
       "open_corresponding_log": "查看对应系统日志",
+      "open_network_settings": "打开网络连接设置",
       "success": "{workname}已完成",
       "warning": "{workname}需要确认：\n{message}"
     },
@@ -4912,7 +4926,6 @@
       "install_cancelled": "已取消安装更新。",
       "partial_no_update": "部分更新源暂时不可用，当前可用来源未发现新版本。",
       "recommend_scan": "建议执行一次全量扫描，以应用新版本的核心引擎特性！",
-      "start_failed": "启动更新失败。请检查网络连接、代理设置和安装目录权限。",
       "up_to_date": "当前已是最新版本"
     },
     "workspace": {
@@ -6429,6 +6442,8 @@
         "unbound": "未绑定"
       },
       "network": {
+        "community_tools_help": "以上工具由社区独立维护，需自行下载并按工具说明启用。建议先使用一种，避免多个加速工具同时开启造成冲突。",
+        "community_tools_title": "社区网络工具推荐",
         "custom_hosts": "自定义 Hosts 映射",
         "custom_hosts_desc": "手动指定域名对应的 IP 地址。一般不需要修改，只有在你明确知道目标地址时才使用。",
         "dynamic_mirrors_enabled": "启用动态镜像节点",
@@ -6537,6 +6552,11 @@
         "steam_web_api_key_placeholder": "填写后启用增强搜索",
         "steam_web_api_key_risk": "任何人一旦获取了此 Key，就可以在不触发 Steam 令牌的情况下，暗中取消玩家的真实交易，并替换为发给骗子的假交易。绝对不要将 API 密钥分享给任何人或任何未经验证的第三方网站。",
         "steam_web_api_key_warning": "注意！“API 密钥（API Key）相当于你的 Steam 账号后门钥匙”。可以读取账号公开数据/库存信息 以及 管理与监听交易报价。",
+        "steamcommunity302_description": "改善 Steam 社区、创意工坊等页面的连接问题，遇到网页打不开或图片加载异常时可以尝试。",
+        "steampp_description": "为 Steam 社区、创意工坊等网站提供访问加速，并集成账号切换等 Steam 实用工具。",
+        "system_hosts_applying": "正在更新系统 Hosts",
+        "system_hosts_authorizing": "正在等待管理员授权，请留意系统授权窗口。不影响设置保存。",
+        "system_hosts_retry": "重试已保存的系统 Hosts 设置",
         "title": "网络协议与代理",
         "use_proxy_on_ai": "为 AI 请求使用代理",
         "use_proxy_on_ai_desc": "如果启用，AI 将通过代理服务器进行。已经是国内代理后的端口不用开此选项。",
@@ -6544,8 +6564,9 @@
         "use_proxy_on_steamcmd_desc": "SteamCMD 是否使用代理服务器。\n\n如果启用，SteamCMD 下载、更新、安装等操作将通过代理服务器进行。",
         "username": "用户名",
         "visit": "访问",
+        "visit_tool_website": "访问工具网页",
         "write_to_system_hosts": "将 Hosts 映射应用到系统",
-        "write_to_system_hosts_desc": "将动态和自定义映射一起写入系统 hosts 文件，让其他软件也能使用。通常无需开启；此操作会修改系统文件，可能需要管理员权限，退出软件时会尝试移除写入的映射。"
+        "write_to_system_hosts_desc": "将动态和自定义映射写入系统 Hosts，让其他软件也能使用，通常无需开启。保存相关设置或点击重试时，Windows 可能请求管理员授权；启动更新和退出清理不会弹出授权窗口。退出时会尝试移除映射，无权清理时可能保留，请在退出前关闭此项并保存。"
       },
       "panel": {
         "apply_and_save": "应用并保存配置",

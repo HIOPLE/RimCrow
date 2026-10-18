@@ -4285,6 +4285,18 @@
       "import_success": "匯入成功"
     }
   },
+  "network": {
+    "hosts": {
+      "authorization_cancelled": "已取消管理員授權，系統 Hosts 未完成更新。應用程式內的映射不受影響。",
+      "authorization_timeout": "等待管理員授權逾時，系統 Hosts 未完成更新。需要時可點選重試。",
+      "content_changed": "偵測到其他程式修改了系統 Hosts，請停止同時修改後重試。",
+      "permission_denied": "沒有權限更新系統 Hosts。可點選重試並允許管理員授權，或檢查安全軟體的攔截設定。",
+      "permission_denied_unix": "沒有權限更新系統 Hosts，請檢查系統檔案權限後重試。應用程式內的映射不受影響。",
+      "system_apply_failed": "系統 Hosts 無法更新，應用程式內的映射仍可使用。請檢查系統檔案權限或安全軟體設定後重試。",
+      "system_remove_failed": "系統 Hosts 中可能仍保留先前的映射，請點選重試完成清理。",
+      "write_timeout": "系統 Hosts 更新逾時，結果尚未確認。請點選重試以確認並套用已儲存的設定。"
+    }
+  },
   "secret": {
     "errors": {
       "backend_unavailable": "系統憑據庫不可用",
@@ -4578,7 +4590,9 @@
   "toast": {
     "api": {
       "error": "{workname}失敗：\n{message}",
+      "network_advice": "連線不穩定時，可前往「網路連線」調整網路設定，或查看推薦的網路最佳化工具。",
       "open_corresponding_log": "查看對應系統日誌",
+      "open_network_settings": "開啟網路連線設定",
       "success": "{workname}已完成",
       "warning": "{workname}需要確認：\n{message}"
     },
@@ -4912,7 +4926,6 @@
       "install_cancelled": "已取消安裝更新。",
       "partial_no_update": "部分更新源暫時不可用，目前可用來源未發現新版本。",
       "recommend_scan": "建議執行一次全量掃描，以應用新版本的核心引擎特性！",
-      "start_failed": "啟動更新失敗。請檢查網路連線、代理設定和安裝目錄權限。",
       "up_to_date": "目前已是最新版本"
     },
     "workspace": {
@@ -6429,6 +6442,8 @@
         "unbound": "未綁定"
       },
       "network": {
+        "community_tools_help": "以上工具由社群獨立維護，需自行下載並依工具說明啟用。建議先使用一種，避免同時開啟多個加速工具造成衝突。",
+        "community_tools_title": "社群網路工具推薦",
         "custom_hosts": "自定義 Hosts 映射",
         "custom_hosts_desc": "手動指定網域對應的 IP 位址。一般不需要修改，只有在你確定目標位址時才使用。",
         "dynamic_mirrors_enabled": "[UNTRANSLATED] 启用动态镜像节点",
@@ -6537,6 +6552,11 @@
         "steam_web_api_key_placeholder": "填寫後啟用增強搜尋",
         "steam_web_api_key_risk": "任何人一旦獲取了此 Key，就可以在不觸發 Steam 令牌的情況下，暗中取消玩家的真實交易，並替換為發給騙子的假交易。絕對不要將 API 密鑰分享給任何人或任何未經驗證的第三方網站。",
         "steam_web_api_key_warning": "注意！“API 密鑰（API Key）相當於你的 Steam 賬號後門鑰匙”。可以讀取賬號公開資料/庫存資訊 以及 管理與監聽交易報價。",
+        "steamcommunity302_description": "改善 Steam 社群、工作坊等頁面的連線問題，遇到網頁無法開啟或圖片載入異常時可以嘗試。",
+        "steampp_description": "改善 Steam 社群、工作坊等網站的存取速度，並整合帳號切換等 Steam 實用工具。",
+        "system_hosts_applying": "正在更新系統 Hosts",
+        "system_hosts_authorizing": "正在等待管理員授權，請留意系統授權視窗。不影響設定儲存。",
+        "system_hosts_retry": "重試已儲存的系統 Hosts 設定",
         "title": "網路協議與代理",
         "use_proxy_on_ai": "為 AI 請求使用代理",
         "use_proxy_on_ai_desc": "如果啟用，AI 將通過代理服務器進行。已經是國內代理後的端口不用開此選項。",
@@ -6544,8 +6564,9 @@
         "use_proxy_on_steamcmd_desc": "SteamCMD 是否使用代理服務器。\n\n如果啟用，SteamCMD 下載、更新、安裝等操作將通過代理服務器進行。",
         "username": "使用者名",
         "visit": "訪問",
+        "visit_tool_website": "造訪工具網頁",
         "write_to_system_hosts": "將 Hosts 對應套用至系統",
-        "write_to_system_hosts_desc": "將動態與自訂對應一起寫入系統 hosts 檔案，讓其他軟體也能使用。通常無需開啟；此操作會修改系統檔案，可能需要管理員權限，結束軟體時會嘗試移除寫入的對應。"
+        "write_to_system_hosts_desc": "將動態和自訂映射寫入系統 Hosts，讓其他軟體也能使用，通常不需要開啟。儲存相關設定或點選重試時，Windows 可能要求管理員授權；啟動更新和結束清理不會顯示授權視窗。結束時會嘗試移除映射，沒有清理權限時可能保留，請在結束前關閉此項並儲存。"
       },
       "panel": {
         "apply_and_save": "應用並儲存配置",
