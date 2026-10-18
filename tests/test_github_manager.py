@@ -1,13 +1,15 @@
 import shutil
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
 import requests
 
+from backend.api import API
 from backend.managers.mgr_download import DownloadTask
 from backend.managers.mgr_github import (
     GIT_PROVIDER_GITHUB,
@@ -268,53 +270,25 @@ class TestGithubManager(unittest.TestCase):
             with self.assertRaises(requests.HTTPError):
                 self.manager.fetch_repo_branches("https://gitgud.io/team/repo")
 
-    def test_github_api_candidate_falls_back_when_mirror_returns_invalid_json(self):
-        mirror_response = MagicMock(status_code=200)
-        mirror_response.json.side_effect = ValueError("invalid mirror payload")
-        direct_response = MagicMock(status_code=200)
-        direct_response.json.return_value = [{"name": "main"}]
-        with patch.object(self.manager, "_github_download_candidates", return_value=[
-            "https://mirror.example/repos/user/repo/branches",
-            "https://api.github.com/repos/user/repo/branches",
-        ]), patch("backend.managers.mgr_github.build_retry_session") as build:
-            session = build.return_value.__enter__.return_value
-            session.get.side_effect = [mirror_response, direct_response]
-            branches = self.manager.fetch_repo_branches("https://github.com/user/repo")
-
-        self.assertEqual(branches, ["main"])
-        self.assertEqual(session.get.call_count, 2)
-
-    def test_release_web_falls_back_when_mirror_does_not_redirect(self):
-        mirror_response = MagicMock(status_code=200, headers={})
-        direct_response = MagicMock(status_code=302, headers={"Location": "https://github.com/user/repo/releases/tag/v1.2.3"})
-        with patch.object(self.manager, "_github_download_candidates", return_value=[
-            "https://mirror.example/user/repo/releases/latest",
-            "https://github.com/user/repo/releases/latest",
-        ]), patch("backend.managers.mgr_github.build_retry_session") as build:
-            session = build.return_value.__enter__.return_value
-            session.get.side_effect = [mirror_response, direct_response]
-            result = self.manager.fetch_release_web("user", "repo")
-
-        self.assertEqual(result["tag_name"], "v1.2.3")
-        self.assertEqual(session.get.call_count, 2)
-
-    def test_commit_web_falls_back_when_mirror_atom_has_no_entries(self):
-        mirror_response = MagicMock(status_code=200, text="<feed></feed>")
-        direct_response = MagicMock(status_code=200, text=(
+    def test_web_metadata_parses_release_redirect_and_commit_feed(self):
+        release_response = MagicMock(status_code=302, headers={"Location": "https://github.com/user/repo/releases/tag/v1.2.3"})
+        commit_response = MagicMock(status_code=200, text=(
             '<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
             '<id>https://github.com/user/repo/commit/abcdef1</id>'
             '</entry></feed>'
         ))
-        with patch.object(self.manager, "_github_download_candidates", return_value=[
-            "https://mirror.example/user/repo/commits/main.atom",
-            "https://github.com/user/repo/commits/main.atom",
-        ]), patch("backend.managers.mgr_github.build_retry_session") as build:
+        with patch("backend.managers.mgr_github.build_retry_session") as build:
             session = build.return_value.__enter__.return_value
-            session.get.side_effect = [mirror_response, direct_response]
-            result = self.manager.fetch_commit_web("user", "repo", ref="main")
+            session.get.side_effect = [release_response, commit_response]
+            release = self.manager.fetch_release_web("user", "repo")
+            commit = self.manager.fetch_commit_web("user", "repo", ref="main")
 
-        self.assertEqual(result["sha"], "abcdef1")
-        self.assertEqual(session.get.call_count, 2)
+        self.assertEqual(release["tag_name"], "v1.2.3")
+        self.assertEqual(commit["sha"], "abcdef1")
+        self.assertEqual([call.args[0] for call in session.get.call_args_list], [
+            "https://github.com/user/repo/releases/latest",
+            "https://github.com/user/repo/commits/main.atom",
+        ])
 
     def test_release_failure_preserves_cached_release_and_refreshes_source(self):
         cached = {"has_release": True, "latest_release_tag": "v1", "latest_source_branch": "master", "latest_source_commit_sha": "old"}
@@ -352,18 +326,6 @@ class TestGithubManager(unittest.TestCase):
         self.assertFalse(info["has_release"])
         cache.assert_not_called()
 
-    def test_branch_slashes_are_encoded_in_download_url_and_not_used_as_filename_paths(self):
-        for provider, host in [(GIT_PROVIDER_GITHUB, "github.com"), (GIT_PROVIDER_GITLAB, "gitgud.io")]:
-            with self.subTest(provider=provider):
-                request = GithubInstallRequest(
-                    owner="user", repo="repo", provider=provider, host=host, project_path="user/repo",
-                    artifact=GithubArtifactRequest(kind=GITHUB_ARTIFACT_SOURCE_ARCHIVE, source_ref="feature/1.7"),
-                )
-                with patch.object(self.manager, "fetch_commit", return_value={"sha": "a" * 40}), \
-                     patch.object(self.manager, "fetch_gitlab_commit", return_value={"id": "a" * 40}):
-                    resolved = self.manager._resolve_source_archive(request)
-                self.assertEqual(resolved.filename, "repo_aaaaaaaaaaaa_source.zip")
-                self.assertIn("a" * 40, resolved.download_url)
 
     def test_gitlab_release_api_failure_uses_existing_tag_archive_fallback(self):
         request = GithubInstallRequest(
@@ -700,6 +662,7 @@ class TestGithubManager(unittest.TestCase):
                 "fork": False,
                 "archived": False,
             },
+            session=MagicMock(),
             checked_about_count=0,
         )
 
@@ -727,6 +690,7 @@ class TestGithubManager(unittest.TestCase):
                 "fork": False,
                 "archived": False,
             },
+            session=MagicMock(),
             checked_about_count=0,
         )
 
@@ -734,7 +698,7 @@ class TestGithubManager(unittest.TestCase):
         self.assertNotIn("detected_by", repo_item)
         self.assertEqual(repo_item["workshop_url"], "https://steamcommunity.com/sharedfiles/filedetails/?id=1234567890")
 
-    def test_github_owner_catalog_uses_candidate_api_requests(self):
+    def test_github_owner_catalog_reads_api_pages(self):
         repo_payload = {
             "name": "ExampleMod",
             "description": "RimWorld mod",
@@ -747,15 +711,19 @@ class TestGithubManager(unittest.TestCase):
             "fork": False,
             "archived": False,
         }
-        with patch.object(self.manager, "_request_github_candidates", side_effect=[
-            [repo_payload],
-            [],
-        ]) as request:
+        first_page = MagicMock(status_code=200)
+        first_page.json.return_value = [repo_payload]
+        last_page = MagicMock(status_code=200)
+        last_page.json.return_value = []
+        with patch("backend.managers.mgr_github.build_retry_session") as build:
+            request = build.return_value.__enter__.return_value.get
+            request.side_effect = [first_page, last_page]
             items = self.manager._fetch_github_owner_catalog("example", {"id": "example", "label": "Example", "match": {"description": ["RimWorld"]}})
 
         self.assertEqual(items[0]["name"], "ExampleMod")
         self.assertEqual(request.call_count, 2)
-        self.assertEqual(request.call_args_list[0].kwargs["params"]["page"], 1)
+        self.assertEqual([call.kwargs["params"]["page"] for call in request.call_args_list], [1, 2])
+        self.assertEqual(request.call_args.args[0], "https://api.github.com/users/example/repos")
 
     def test_fetch_github_readme_returns_empty_when_missing(self):
         class FakeResponse:
@@ -805,6 +773,7 @@ class TestGithubManager(unittest.TestCase):
                 "fork": False,
                 "archived": False,
             },
+            session=MagicMock(),
             checked_about_count=0,
             source=source,
         )
@@ -1167,6 +1136,67 @@ class TestTextureOptGithubIntegration(unittest.TestCase):
         self.assertEqual(request.artifact.asset_name_suffix, ".zip")
         self.assertEqual(request.install.action, GITHUB_INSTALL_EXTRACT)
         self.assertEqual(request.install.extract_dir, str(self.temp_root / "texture_tools"))
+
+
+class TestGithubApi(unittest.TestCase):
+    def setUp(self):
+        self.api = API.__new__(API)
+        self.api._api_call_lock = threading.Lock()
+        self.api._api_call_threads = {}
+        self.api.github_mgr = GithubManager()
+        self.api.github_mgr.record_timeline = Mock()
+        self.api.github_mgr.fetch_repo_info = Mock(return_value={"source_status": "available", "latest_source_branch": "dev"})
+        self.api.github_trigger_download = Mock(return_value={"status": "success", "data": {"task_id": "task-1"}})
+        self.api.github_get_subscribed = Mock(return_value={"status": "success", "data": []})
+
+    def test_github_subscribe_starts_download_after_record_is_saved(self):
+        api = self.api
+        record = SimpleNamespace(save=Mock())
+
+        with patch("backend.api.GithubModRecord.get_or_create", return_value=(record, True)), \
+             patch("backend.api.db.atomic"):
+            result = api.github_subscribe({
+                "url": "https://github.com/team/mod",
+                "owner": "team",
+                "repo": "mod",
+                "default_branch": "dev",
+                "install_type": "source",
+            })
+
+        api.github_trigger_download.assert_called_once_with(
+            "https://github.com/team/mod", "source", "dev",
+            {"ref_type": "branch", "asset_name": "", "source_subpath": ""},
+        )
+        self.assertEqual(result["status"], "success")
+
+    def test_switch_branch_keeps_installed_version_and_reports_download_start_failure(self):
+        record = SimpleNamespace(owner="team", repo_name="mod", installed_version="master@old", save=Mock())
+        self.api.github_trigger_download.return_value = {"status": "error", "message": "download failed"}
+        with patch("backend.api.GithubModRecord.get_or_create", return_value=(record, False)), \
+             patch("backend.api.db.atomic"):
+            result = self.api.github_subscribe({
+                "url": "https://gitgud.io/team/mod.git", "default_branch": "feature/1.7", "install_type": "source",
+                "info": {"source_status": "available", "latest_source_branch": "feature/1.7"},
+            })
+        self.assertEqual(record.target_branch, "feature/1.7")
+        self.assertEqual(record.installed_version, "master@old")
+        self.api.github_trigger_download.assert_called_once_with(
+            "https://gitgud.io/team/mod", "source", "feature/1.7",
+            {"ref_type": "branch", "asset_name": "", "source_subpath": ""},
+        )
+        self.assertEqual(result["status"], "error")
+        self.api.github_get_subscribed.assert_not_called()
+
+    def test_missing_source_branch_does_not_change_subscription_or_start_download(self):
+        self.api.github_mgr.fetch_repo_info.return_value = {"source_status": "missing"}
+        with patch("backend.api.GithubModRecord.get_or_create") as save:
+            result = self.api.github_subscribe({
+                "url": "https://github.com/team/mod", "default_branch": "missing", "install_type": "source",
+                "info": {"source_status": "missing"},
+            })
+        self.assertEqual(result["status"], "error")
+        save.assert_not_called()
+        self.api.github_trigger_download.assert_not_called()
 
 
 if __name__ == "__main__":

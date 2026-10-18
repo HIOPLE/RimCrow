@@ -41,13 +41,14 @@ test('backend canonical language code is used by the active locale', async () =>
 })
 
 test('locale load errors keep the active locale and reach the caller', async () => {
+  const previousLocale = i18nModule.getCurrentLocale()
   window.pywebview.api.locale_load_user_messages = async () => ({
     status: 'error',
     user_message: '读取用户语言文件失败。',
   })
 
   await assert.rejects(i18nModule.setLocale('de'), /读取用户语言文件失败/)
-  assert.equal(i18nModule.getCurrentLocale(), 'pt-BR')
+  assert.equal(i18nModule.getCurrentLocale(), previousLocale)
 })
 
 test('translation validation detects placeholders and format markers', () => {

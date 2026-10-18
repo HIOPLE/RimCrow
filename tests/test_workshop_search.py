@@ -345,6 +345,7 @@ class TestWorkshopSearch(unittest.TestCase):
             patch.object(SteamWebAPI, "_get_steam_web_api_key", return_value="test-key"),
             patch.object(SteamWebAPI, "_request_published_file_service", side_effect=fake_request_service),
             patch.object(SteamWebAPI, "_save_online_details") as save_mock,
+            patch.object(SteamWebAPI, "fetch_player_summaries", return_value={}),
         ):
             result = SteamWebAPI.fetch_published_file_service_details(["1111111111"], language="zh-CN")
 
@@ -891,6 +892,7 @@ class TestWorkshopSearch(unittest.TestCase):
         with (
             patch.object(SteamWebAPI, "_get_steam_web_api_key", return_value="test-key"),
             patch.object(SteamWebAPI, "_request_published_file_service", side_effect=fake_request_service),
+            patch.object(SteamWebAPI, "fetch_player_summaries", return_value={}),
         ):
             result = SteamWebAPI.get_user_files("76561198000000001", filters={"return_vote_data": True})
 

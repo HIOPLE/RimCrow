@@ -158,8 +158,7 @@ def test_mp_compat_package_ids_can_be_generated_from_source_archive(tmp_path):
 @pytest.mark.parametrize("mirror_content", [b"__invalid_zip__", b"<html>login</html>"])
 def test_github_source_archive_falls_back_for_invalid_mirror_response(mirror_content):
     manager = MultiplayerCompatibilityManager()
-    session = patch("backend.managers.mgr_multiplayer_compat.build_retry_session").start()
-    try:
+    with patch("backend.managers.mgr_multiplayer_compat.build_retry_session") as session:
         http = session.return_value.__enter__.return_value
         archive_buffer = io.BytesIO()
         with zipfile.ZipFile(archive_buffer, "w") as archive:
@@ -174,8 +173,6 @@ def test_github_source_archive_falls_back_for_invalid_mirror_response(mirror_con
         assert content == archive_buffer.getvalue()
         assert final_url == "https://github.com/archive.zip"
         record_result.assert_called_once_with("https://mirror/archive.zip", success=False, capability="archive")
-    finally:
-        patch.stopall()
 
 
 def test_official_compatibility_file_is_formatted_after_download(tmp_path):
