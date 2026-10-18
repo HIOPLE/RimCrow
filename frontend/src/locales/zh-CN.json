@@ -3842,6 +3842,8 @@
     "message": {
       "alternative_used": "__{title}__：前置依赖 [[{base}]] 已由备选模组 [[{alternative}]] 替代",
       "dependency_after_mod": "!!依赖后置!!：必须在依赖 [[{mod}]] 之后加载",
+      "disabled_dependency": "前置模组 [[{mod}]] 已被禁用，将不会在游戏中加载。请先在“已禁用”列表中重新启用。",
+      "disabled_mod": "该模组已被禁用，将不会在游戏中加载。文件仍保留，可在“已禁用”列表中重新启用。",
       "inactive_alternative_dependency": "!!{title}!!：未启用备选前置模组 [[{mod}]]",
       "inactive_dependency": "!!{title}!!：未启用前置模组 [[{mod}]]",
       "inactive_language_pack": "^^{title}^^：不支持当前语言，但本地存在语言包 [[{pack}]]",
@@ -5699,6 +5701,9 @@
         "by_name_short": "按原名",
         "by_package_id": "按包名",
         "by_workshop_id": "按工坊 ID"
+      },
+      "status": {
+        "disabled": "已禁用"
       }
     },
     "mod_details": {

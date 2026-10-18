@@ -3842,6 +3842,8 @@
     "message": {
       "alternative_used": "__{title}__: 종속성 [[{base}]]가 대체 모드 [[{alternative}]]로 대체되었습니다.",
       "dependency_after_mod": "!!Dependency After Target!!: 종속성 [[{mod}]] 이후에 로드해야 함",
+      "disabled_dependency": "필수 모드 [[{mod}]]이(가) 비활성화되어 게임에서 로드되지 않습니다. 먼저 비활성화 목록에서 다시 활성화하세요.",
+      "disabled_mod": "이 모드는 비활성화되어 게임에서 로드되지 않습니다. 파일은 그대로 남아 있으며, 비활성화 목록에서 다시 활성화할 수 있습니다.",
       "inactive_alternative_dependency": "!!{title}!!: 대체 종속성 [[{mod}]]가 활성화되지 않았습니다.",
       "inactive_dependency": "!!{title}!!: 종속성 [[{mod}]]이 활성화되지 않았습니다.",
       "inactive_language_pack": "^^{title}^^: 현재 언어를 지원하지 않지만, 로컬 언어팩 [[{pack}]]이 존재합니다.",
@@ -5699,6 +5701,9 @@
         "by_name_short": "원래 이름 기준",
         "by_package_id": "패키지 ID 기준",
         "by_workshop_id": "Workshop ID 기준"
+      },
+      "status": {
+        "disabled": "비활성화됨"
       }
     },
     "mod_details": {

@@ -3842,6 +3842,8 @@
     "message": {
       "alternative_used": "__{title}__: Abhängigkeit [[{base}]] wird durch alternativen Mod [[{alternative}]] ersetzt",
       "dependency_after_mod": "!!Abhängigkeit nach Ziel!!: muss nach der Abhängigkeit geladen werden [[{mod}]]",
+      "disabled_dependency": "Die benötigte Mod [[{mod}]] wurde deaktiviert und wird im Spiel nicht geladen. Aktiviere sie zuerst in der Liste „Deaktiviert“ wieder.",
+      "disabled_mod": "Diese Mod wurde deaktiviert und wird im Spiel nicht geladen. Die Dateien sind weiterhin vorhanden. Du kannst sie in der Liste „Deaktiviert“ wieder aktivieren.",
       "inactive_alternative_dependency": "!!{title}!!: Alternative Abhängigkeit [[{mod}]] ist nicht aktiv",
       "inactive_dependency": "!!{title}!!: Abhängigkeit [[{mod}]] ist nicht aktiv",
       "inactive_language_pack": "^^{title}^^: Unterstützt die aktuelle Sprache nicht, aber das lokale Sprachpaket [[{pack}]] ist vorhanden",
@@ -5699,6 +5701,9 @@
         "by_name_short": "Nach Originalname",
         "by_package_id": "Nach Paket-ID",
         "by_workshop_id": "Nach Workshop-ID"
+      },
+      "status": {
+        "disabled": "Deaktiviert"
       }
     },
     "mod_details": {

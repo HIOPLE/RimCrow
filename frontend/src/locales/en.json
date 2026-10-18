@@ -3842,6 +3842,8 @@
     "message": {
       "alternative_used": "__{title}__: dependency [[{base}]] is replaced by alternative mod [[{alternative}]]",
       "dependency_after_mod": "!!Dependency After Target!!: must load after dependency [[{mod}]]",
+      "disabled_dependency": "Required mod [[{mod}]] has been disabled and will not load in the game. Re-enable it in the Disabled list first.",
+      "disabled_mod": "This mod has been disabled and will not load in the game. Its files are still present. You can re-enable it in the Disabled list.",
       "inactive_alternative_dependency": "!!{title}!!: alternative dependency [[{mod}]] is not active",
       "inactive_dependency": "!!{title}!!: dependency [[{mod}]] is not active",
       "inactive_language_pack": "^^{title}^^: does not support the current language, but local language pack [[{pack}]] exists",
@@ -5699,6 +5701,9 @@
         "by_name_short": "By original name",
         "by_package_id": "By package ID",
         "by_workshop_id": "By Workshop ID"
+      },
+      "status": {
+        "disabled": "Disabled"
       }
     },
     "mod_details": {

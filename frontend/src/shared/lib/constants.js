@@ -53,6 +53,7 @@ export const ISSUE_LEVEL = {
 // 错误类型枚举
 export const ISSUE_TYPE = {
   ERROR_MISSING_FILE: 'missing_file',               // 本地文件缺失
+  ERROR_DISABLED_MOD: 'disabled_mod',               // 物理禁用，不会被游戏加载
   ERROR_MISSING_DEPENDENCY: 'missing_dependency',   // 缺前置 (完全没装)
   ERROR_INACTIVE_DEPENDENCY: 'inactive_dependency', // 前置没启用
   ERROR_INCOMPATIBLE: 'incompatible',               // 不兼容
@@ -77,6 +78,7 @@ export const ISSUE_TYPE = {
 export const getIssueTitle = (type) => {
   const key = String(type || 'default')
   if (key === 'missing_file') return t('ui.issue.missing_file', '文件缺失')
+  if (key === 'disabled_mod') return t('ui.mod.status.disabled', '已禁用')
   if (key === 'missing_dependency') return t('ui.issue.missing_dependency', '依赖缺失')
   if (key === 'inactive_dependency') return t('ui.issue.inactive_dependency', '依赖未启用')
   if (key === 'incompatible') return t('ui.issue.incompatible', '模组冲突')

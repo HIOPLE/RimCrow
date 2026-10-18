@@ -46,7 +46,7 @@ export const useModStore = defineStore('mods', () => {
     return normalized ? `${normalized}/` : ''
   }
   const isExportableRuntimeMod = (mod) => {
-    if (!mod || mod.isMissing || !mod.path) return false
+    if (!mod || mod.isMissing || mod.disabled || !mod.path) return false
     const localRoot = normalizeRuntimeRoot(profileStore.activeContext?.local_mods_path)
     const selfRoot = normalizeRuntimeRoot(appStore.settings?.self_mods_path)
     const workshopRoot = normalizeRuntimeRoot(appStore.settings?.workshop_mods_path)
@@ -127,6 +127,19 @@ export const useModStore = defineStore('mods', () => {
   const tempIds = ref([])             // 临时Mod列表
   const activeIds = ref([])           // 已激活Mod列表
   const disabledMods = ref([])        // 当前环境路径范围内的物理禁用 Mod 资产
+  const disabledModsByToken = computed(() => {
+    const index = new Map()
+    const priority = { local: 3, self: 2, workshop: 1 }
+    for (const mod of disabledMods.value) {
+      const id = normalizeCanonicalId(mod.package_id)
+      if (!id) continue
+      const tokens = [id, mod.store === 'workshop' ? buildSteamPackageToken(id) : `${id}_local`]
+      for (const token of tokens) {
+        if (!index.has(token) || (priority[mod.store] || 0) > (priority[index.get(token).store] || 0)) index.set(token, mod)
+      }
+    }
+    return index
+  })
   const strictDisableRestoreFailures = ref({}) // 本次扫描中严格禁用恢复失败的提示
 
   const interlocksMap = ref(new Map()) // 联锁字典: Map<String(interlock_id), Array<String(package_ids)>>
@@ -267,6 +280,15 @@ export const useModStore = defineStore('mods', () => {
     if (!id) return null
     const tokenInfo = parsePackageToken(id)
     const canonicalId = tokenInfo.canonicalPackageId || normalizeCanonicalId(id)
+    const availableMod = allModsMap.value.get(canonicalId)
+    // 禁用资产只作为展示回退，不混入可安装、可排序的主集合；Steam 来源不能借用本地副本状态。
+    const disabledMod = (!availableMod || availableMod.isMissing || (tokenInfo.sourcePreference === 'steam' && !availableMod.coexist_workshop_variant))
+      ? disabledModsByToken.value.get(tokenInfo.sourcePreference === 'any' ? canonicalId : tokenInfo.normalizedToken)
+      : null
+    if (disabledMod) return {
+      ...disabledMod, disabled: true, isMissing: false, canonical_package_id: canonicalId,
+      active_package_token: tokenInfo.normalizedToken, source_preference: tokenInfo.sourcePreference,
+    }
     if (canonicalId && allModsMap.value.has(canonicalId)) {
       const mod = allModsMap.value.get(canonicalId)
       applyInstallSourceHintToMod(mod, canonicalId)
@@ -313,6 +335,7 @@ export const useModStore = defineStore('mods', () => {
   }
   const hasRealModById = (id) => {
     if (!id) return false
+    if (takeModById(id)?.disabled) return false
     const mod = resolveStoredMod(id)
     if (!mod) return false
     // ghost 项虽然会被塞进 allModsMap，但它们不应该被当成“真实已安装模组”。
@@ -438,7 +461,7 @@ export const useModStore = defineStore('mods', () => {
     // 筛选出本地缺失(完全未知或本身就是 isMissing )的 ID
     const unknownIds = normalizedIds.filter(id => {
       const existing = allModsMap.value.get(id)
-      return !existing || existing.isMissing
+      return (!existing || existing.isMissing) && !disabledModsByToken.value.has(id)
     })
     if (unknownIds.length === 0) return
 
@@ -482,6 +505,8 @@ export const useModStore = defineStore('mods', () => {
             )
             idsToFetch.forEach(id => {
               const currentGhost = allModsMap.value.get(id) || null
+              // 查询期间扫描可能已恢复或禁用该资产，旧工坊响应不能覆盖新状态。
+              if ((currentGhost && !currentGhost.isMissing) || disabledModsByToken.value.has(id)) return
               if (
                 dismissedUnavailableIds.has(id)
                 && (!currentGhost || currentGhost.isMissing || !currentGhost.path)
