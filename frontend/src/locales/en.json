@@ -3236,7 +3236,7 @@
       "workshop_status_failed": "Failed to check Steam Workshop install status. Make sure Steam is running and logged in, then try again later."
     },
     "steamcmd": {
-      "acf_read_failed": "Failed to read SteamCMD Workshop records. Check file permissions or try again later.",
+      "acf_repair_failed": "Failed to repair SteamCMD Workshop records. Check the file format, permissions, and whether the file is in use.",
       "download_start_failed": "Failed to start SteamCMD download. Check network connection, proxy settings, SteamCMD status, and target folder permissions.",
       "execution_failed": "SteamCMD failed. Check the Steam installation, network connection, and download environment.",
       "execution_failed_with_target": "SteamCMD failed. Check the Steam installation, network connection, and download folder permissions.",

@@ -380,14 +380,24 @@ class TestNetworkManagerHostsCleanup(unittest.TestCase):
             "api.github.com", "raw.githubusercontent.com", "codeload.github.com",
             "images.steamusercontent.com", "steamuserimages-a.akamaihd.net",
             "steamcommunity.com", "api.steampowered.com", "gitgud.io",
+            "steamcdn-a.akamaihd.net", "client-update.steamstatic.com",
+            "dl.steam.clngaa.com", "st.dl.eccdnx.com", "xz.pphimalayanrt.com",
         }.issubset(domains))
         self.assertNotIn("wwbns.lanzouu.com", domains)
         self.assertTrue(domains.isdisjoint({
             "avatars.steamstatic.com", "avatars.fastly.steamstatic.com", "community.fastly.steamstatic.com",
-            "shared.fastly.steamstatic.com", "steamcdn-a.akamaihd.net",
+            "shared.fastly.steamstatic.com",
         }))
         self.assertEqual(len(domains), len(result["targets"]))
         self.assertEqual(len({item["id"] for item in result["targets"]}), len(result["targets"]))
+        steamcmd_urls = {item["id"]: item["url"] for item in result["targets"] if item["id"].startswith("steamcmd_")}
+        self.assertEqual(steamcmd_urls, {
+            "steamcmd_install": "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip",
+            "steamcmd_update": "https://client-update.steamstatic.com/steam_cmd_win32",
+            "steamcmd_cdn_clngaa": "http://dl.steam.clngaa.com/",
+            "steamcmd_cdn_eccdnx": "http://st.dl.eccdnx.com/",
+            "steamcmd_cdn_pphimalayanrt": "http://xz.pphimalayanrt.com/",
+        })
         sourceforge = next(item for item in result["targets"] if item["id"] == "sourceforge")
         gitee = next(item for item in result["targets"] if item["id"] == "gitee")
         github = next(item for item in result["targets"] if item["id"] == "github")

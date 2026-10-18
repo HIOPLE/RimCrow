@@ -398,11 +398,6 @@ class ModScanner:
                     ModDAO.batch_update_mods(mods_to_touch)
                 if shadow_paths_map:
                     ModDAO.batch_update_shadow_paths(shadow_paths_map)
-            # 扫描完成后再基于本轮 self 域磁盘结果补齐 SteamCMD ACF，
-            # 让 ACF 记录集合与真实目录集合保持同步。异常由外层统一记录阶段和路径。
-            scan_stage = "steamcmd_finalize"
-            stage_started_at = time.perf_counter()
-            SteamManager().reconcile_steamcmd_acf(scan_mods=mods_to_upsert)
             # 入库完成后，再按当前 Profile 的启用域统一分析冲突与运行态收敛依据。
             scan_stage = "runtime_analysis"
             stage_started_at = time.perf_counter()

@@ -45,6 +45,12 @@ NETWORK_CHECK_TARGETS = (
     ("sourceforge", "SourceForge 下载入口", "https://sourceforge.net/projects/rimcrow/files/latest/download?format=json"),
     ("steam_workshop", "Steam 创意工坊", "https://steamcommunity.com/app/294100/workshop/"),
     ("steam_api", "Steam Web API", "https://api.steampowered.com/ISteamWebAPIUtil/GetServerInfo/v1/"),
+    ("steamcmd_install", "SteamCMD 安装包", "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"),
+    ("steamcmd_update", "SteamCMD 更新清单", "https://client-update.steamstatic.com/steam_cmd_win32"),
+    # 下载节点仅作连通性参考，不代表 SteamCMD 的全部可用节点。
+    ("steamcmd_cdn_clngaa", "SteamCMD 下载节点（clngaa）", "http://dl.steam.clngaa.com/"),
+    ("steamcmd_cdn_eccdnx", "SteamCMD 下载节点（eccdnx）", "http://st.dl.eccdnx.com/"),
+    # ("steamcmd_cdn_pphimalayanrt", "SteamCMD 下载节点（pphimalayanrt）", "http://xz.pphimalayanrt.com/"),
     # UGC 图片路径末尾的斜杠不能省略，否则部分图片入口会返回 404。
     ("steam_images", "Steam 工坊图片", "https://images.steamusercontent.com/ugc/781856287315666264/268334829540C1D4FFEEF9924CAB105C60AC4A13/"),
     ("steam_images_legacy", "Steam 工坊图片（旧版）", "https://steamuserimages-a.akamaihd.net/ugc/781856287315666264/268334829540C1D4FFEEF9924CAB105C60AC4A13/"),

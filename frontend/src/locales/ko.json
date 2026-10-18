@@ -3236,7 +3236,7 @@
       "workshop_status_failed": "Steam Workshop 설치 상태를 확인하지 못했습니다. Steam가 실행 중이고 로그인되어 있는지 확인한 후 나중에 다시 시도하세요."
     },
     "steamcmd": {
-      "acf_read_failed": "SteamCMD Workshop 기록을 읽지 못했습니다. 파일 권한을 확인하거나 잠시 후 다시 시도하세요.",
+      "acf_repair_failed": "SteamCMD 워크숍 기록을 복구하지 못했습니다. 파일 형식과 접근 권한을 확인하고 파일이 사용 중인지 확인하세요.",
       "download_start_failed": "SteamCMD 다운로드를 시작하지 못했습니다. 네트워크 연결, 프록시 설정, SteamCMD 상태, 대상 폴더 권한을 확인하세요.",
       "execution_failed": "SteamCMD 실행에 실패했습니다. Steam 설치, 네트워크 연결과 다운로드 환경을 확인하세요.",
       "execution_failed_with_target": "SteamCMD 실행에 실패했습니다. Steam 설치, 네트워크 연결과 다운로드 폴더 권한을 확인하세요.",

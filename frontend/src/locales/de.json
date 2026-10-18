@@ -3236,7 +3236,7 @@
       "workshop_status_failed": "Der Installationsstatus von Steam Workshop konnte nicht überprüft werden. Stellen Sie sicher, dass Steam ausgeführt und angemeldet ist, und versuchen Sie es später erneut."
     },
     "steamcmd": {
-      "acf_read_failed": "SteamCMD-Workshop-Datensätze konnten nicht gelesen werden. Prüfen Sie Dateirechte oder versuchen Sie es später erneut.",
+      "acf_repair_failed": "Die SteamCMD-Workshop-Einträge konnten nicht repariert werden. Prüfe das Dateiformat, die Zugriffsrechte und ob die Datei gerade verwendet wird.",
       "download_start_failed": "Der SteamCMD-Download konnte nicht gestartet werden. Überprüfen Sie die Netzwerkverbindung, die Proxy-Einstellungen, den SteamCMD-Status und die Berechtigungen für den Zielordner.",
       "execution_failed": "SteamCMD-Ausführung fehlgeschlagen. Prüfen Sie Steam-Installation, Netzwerkverbindung und Downloadumgebung.",
       "execution_failed_with_target": "SteamCMD-Ausführung fehlgeschlagen. Prüfen Sie Steam-Installation, Netzwerkverbindung und Rechte des Downloadordners.",

@@ -3236,7 +3236,7 @@
       "workshop_status_failed": "检查 Steam 工坊安装状态失败。请确认 Steam 已启动并完成登录，稍后重试。"
     },
     "steamcmd": {
-      "acf_read_failed": "读取 SteamCMD 工坊记录失败。请检查文件权限或稍后重试。",
+      "acf_repair_failed": "SteamCMD 工坊记录修复失败。请检查文件格式、权限或是否正在使用。",
       "download_start_failed": "启动 SteamCMD 下载失败。请检查网络连接、代理设置、SteamCMD 状态和目标目录权限。",
       "execution_failed": "SteamCMD 执行失败，请检查 Steam 安装、网络连接和下载环境。",
       "execution_failed_with_target": "SteamCMD 执行失败，请检查 Steam 安装、网络连接和下载目录权限。",
