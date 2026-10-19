@@ -16,6 +16,8 @@ import uuid
 import webbrowser
 import webview
 import tempfile
+from contextlib import nullcontext
+from copy import deepcopy
 from pathlib import Path
 from dataclasses import dataclass, asdict, fields, is_dataclass
 from types import SimpleNamespace
@@ -152,7 +154,8 @@ from backend.managers.mgr_github import GithubManager, GitSelectionRequired
 from backend.managers.mgr_maintenance import MaintenanceManager
 from backend.managers.mgr_data_bundle import DataBundleManager
 from backend.managers.mgr_mod_package import ModPackageManager
-from backend.managers.mgr_rules import resolve_mod_rules
+from backend.managers.mgr_rules import RuleManager, resolve_mod_rules
+from backend.utils.json_io import write_json_atomic
 from backend.managers.mgr_texture_opt import TextureOptimizationManager
 from backend.managers.mgr_recommendation_export import RecommendationExportManager
 from backend.managers.mgr_multiplayer_compat import MultiplayerCompatibilityManager
@@ -559,6 +562,9 @@ class API:
     所有前端调用的 window.pywebview.api.xxx 方法都在这里定义。
     """
     _runtime_context_lock = threading.RLock()
+    _external_check_lock = threading.Lock()
+    _external_check_run_lock = threading.Lock()
+    _external_checks: dict[str, threading.Event] = {}
 
     def __dir__(self):
         """pywebview 通过 dir() 生成 JS API；这里只暴露 API 类方法，避免递归扫描内部管理器。"""
@@ -5772,7 +5778,7 @@ class API:
             )
 
     @log_api_call
-    def update_trigger_action(self, target_version: str = "", install_confirmed: bool = False) -> Dict[str, Any]:
+    def update_trigger_action(self, target_version: str = "", install_confirmed: bool = False, source_url: str = "") -> Dict[str, Any]:
         """
         [统一入口] 触发更新操作
         下载请求不得因包已就绪而直接安装，安装必须携带前端确认结果。
@@ -5794,7 +5800,7 @@ class API:
             else:
                 if install_confirmed:
                     return ApiResponse.error(tr("api.update.result_changed", "更新信息已变化，请重新查看更新。"))
-                result = self.update_mgr.perform_update_download()
+                result = self.update_mgr.perform_update_download(target_version, source_url)
                 # result 格式: {"status": "downloading", "task_id": "..."}
                 return ApiResponse.success(result, message=tr("api.update.download_started", "开始下载更新包"))
                 
@@ -5834,18 +5840,43 @@ class API:
             )
 
     @log_api_call
-    def maintenance_check_external_data(self, overrides: dict | None = None):
+    def maintenance_check_external_data(self, overrides: dict | None = None) -> dict[str, Any]:
         """检查社区规则/数据库等外部文件是否需要更新。"""
         try:
-            check_overrides = overrides if isinstance(overrides, dict) else None
-            checked = self.maintenance_mgr.check_external_data(check_overrides)
+            check_overrides = dict(overrides) if isinstance(overrides, dict) else None
+            check_id = str((check_overrides or {}).pop("check_id", "") or "")
+            stop = threading.Event()
+            fixed_overrides = dict(check_overrides or {})
+            request_network = None
+            deadline = time.monotonic() + 30
+            if check_id:
+                keys = {key for spec in MaintenanceManager.EXTERNAL_DATASETS for key in (spec["path_key"], spec["url_key"])}
+                keys.add("git_provider_catalog_url")
+                fixed_overrides = {key: getattr(settings.config, key, "") for key in keys}
+                fixed_overrides.update(check_overrides or {})
+                request_network = network_mgr.snapshot_config()
+                request_network["api_mirrors"] = deepcopy(GithubManager.get_effective_mirrors(capability="api"))
+                with self._external_check_lock:
+                    stop = self._external_checks.get(check_id, stop)
+                    for active_id, active in self._external_checks.items():
+                        if active_id != check_id:
+                            active.set()
+                    self._external_checks[check_id] = stop
+            try:
+                with self._external_check_run_lock:
+                    checked = self.maintenance_mgr.check_external_data(fixed_overrides, cancel_event=stop, network_override=request_network, deadline=deadline) if check_id else self.maintenance_mgr.check_external_data(check_overrides)
+            finally:
+                if check_id:
+                    with self._external_check_lock:
+                        if self._external_checks.get(check_id) is stop:
+                            self._external_checks.pop(check_id, None)
             checked_at = int(checked.get("checked_at") or current_ms())
             items = checked.get("items") if isinstance(checked, dict) else []
             failed = checked.get("failed") if isinstance(checked, dict) else []
             items = items if isinstance(items, list) else []
             failed = failed if isinstance(failed, list) else []
             # 整轮远端状态都没拿到时，不刷新“上次成功检查时间”，避免自动检查被失败结果错误限流。
-            if not check_overrides and (not items or len(failed) < len(items)):
+            if not check_overrides and not checked.get("cancelled") and (not items or len(failed) < len(items)):
                 settings.set("last_external_data_update_check_time", checked_at)
             self._log_maintenance_check("api_result", "external-data", status="success", checked_at=checked_at, updates=len(checked.get("updates") or []), failed=len(failed), total=len(items))
             return ApiResponse.success(checked)
@@ -5857,6 +5888,20 @@ class API:
                 detail=e,
                 user_message=tr("errors.maintenance.external_data_check_failed", "检查外部库更新失败。请检查网络连接、代理设置和外部数据源状态。"),
             )
+
+    def maintenance_cancel_external_data_check(self, check_id: str) -> dict[str, Any]:
+        check_id = str(check_id).strip()
+        if not check_id or len(check_id) > 128:
+            return ApiResponse.success(data={"cancel_requested": False})
+        with self._external_check_lock:
+            stop = self._external_checks.get(check_id)
+            if stop is None:
+                # pywebview 调用可能先到取消再登记；只保留少量尚未登记的取消请求。
+                if len(self._external_checks) >= 32:
+                    return ApiResponse.success(data={"cancel_requested": False})
+                stop = self._external_checks.setdefault(check_id, threading.Event())
+            stop.set()
+        return ApiResponse.success(data={"cancel_requested": True})
 
     @log_api_call
     def maintenance_check_steamcmd_mod_updates(self):
@@ -6907,39 +6952,74 @@ class API:
         else:
             return ApiResponse.error(msg)
 
-    def _reload_community_rules(self):
-        """外部规则文件更新后，立即把内存中的规则缓存切到新版本。"""
-        if not self.sorter or not self.sorter.rule_mgr:
-            EventBus.send_toast(tr("toast.rules.community_reload_unavailable", "规则引擎未初始化，无法立即重载社区规则库。"), type="warning")
-            return
-        logger.info("社区规则库已下载完成，正在重载规则缓存。")
-        self.sorter.rule_mgr.load_all()
-
-    def _reload_workshop_database(self):
-        """工坊数据库更新后，同时刷新依赖规则缓存，避免前端继续读旧关联关系。"""
-        logger.info("社区工坊数据库已下载完成，正在重载工坊缓存。")
-        self.workshop_db_mgr.load_all_cache()
-        if self.sorter and self.sorter.rule_mgr:
-            self.sorter.rule_mgr.build_workshop_rules()
-
-    def _reload_instead_database(self):
-        """替代库更新后只需重建外置缓存。"""
-        logger.info("替代 Mod 数据库已下载完成，正在重建替代关系缓存。")
-        self.workshop_db_mgr.rebuild_instead_cache()
-    
-    
     # ==========================================
     #  14. 外置数据管理 (External Data)
     # ==========================================
+    def _commit_external_data(self, task, data_type: str, target: Path, prepared: dict[str, Any]) -> None:
+        """只在短提交段替换正式文件；任何加载失败都恢复文件、数据库和规则内存。"""
+        if task._cancel_event.is_set():
+            raise InterruptedError("Task cancelled by user")
+        rule_mgr = self.sorter.rule_mgr if self.sorter else None
+        if data_type == "community_rules" and rule_mgr is None:
+            raise RuntimeError("规则引擎未初始化，无法加载社区规则")
+        snapshot = {}
+        if rule_mgr and data_type in {"community_rules", "workshop_db"}:
+            names = ("community_rules", "community_rules_update_time") if data_type == "community_rules" else ("workshop_rules_cache",)
+            snapshot = {name: getattr(rule_mgr, name) for name in names}
+        backup = target.with_name(f".{target.name}.{task.task_id}.previous")
+        had_previous = target.exists()
+        is_database = data_type in {"workshop_db", "instead_db"}
+        transaction = self.workshop_db_mgr.dataset_transaction(data_type) if is_database else nullcontext()
+        replaced = False
+        recovery_failed = False
+        try:
+            if had_previous:
+                shutil.copy2(target, backup)
+            # 提交开始后只做本地操作；取消在此之前生效，此后必须先完成提交或恢复。
+            if task._cancel_event.is_set():
+                raise InterruptedError("Task cancelled by user")
+            self.download_mgr._set_task_phase(task, "committing")
+            self.download_mgr._emit_progress(task)
+            with transaction:
+                os.replace(Path(task.metadata["staged_path"]), target)
+                replaced = True
+                if is_database:
+                    self.workshop_db_mgr.import_prepared_dataset(data_type, target, prepared)
+                    if data_type == "workshop_db" and rule_mgr:
+                        rule_mgr.build_workshop_rules(raise_errors=True)
+                elif data_type == "community_rules":
+                    rule_mgr.community_rules = prepared["rules"]
+                    rule_mgr.community_rules_update_time = rule_mgr._parse_community_rules_timestamp(prepared)
+        except BaseException:
+            for name, value in snapshot.items():
+                setattr(rule_mgr, name, value)
+            if replaced:
+                try:
+                    if had_previous:
+                        os.replace(backup, target)
+                    else:
+                        os.replace(target, task.metadata["staged_path"])
+                except OSError:
+                    # 恢复失败时保留完整备份，任务清理不得把唯一旧副本一起删掉。
+                    recovery_failed = True
+                    task.metadata.pop("temporary_dir", None)
+                    logger.error("外部数据恢复失败，保留恢复目录: target=%s backup=%s", target, backup, exc_info=True)
+                    raise
+            raise
+        finally:
+            if not recovery_failed and backup.exists():
+                try:
+                    backup.unlink()
+                except OSError:
+                    logger.warning("外部数据旧文件备份暂未清理: path=%s", backup, exc_info=True)
+        task.dest_path = str(target)
+
     @log_api_call
-    def update_external_db(self, data_type: str):
+    def update_external_db(self, data_type: str) -> dict[str, Any]:
         """
         更新外置数据。
 
-        这里统一承接三类外部库文件：
-        1. 社区规则库
-        2. 社区工坊数据库
-        3. 替代 Mod 数据库
+        下载、结构验证和加载提交属于同一个任务；MP 适配缓存由源码包生成。
         """
         try:
             dataset_specs = {
@@ -6949,7 +7029,6 @@ class API:
                     "success_message": tr("api.external_data.community_rules_done", "社区规则库更新完毕！"),
                     "error_message": tr("api.external_data.community_rules_failed", "社区规则库更新失败！"),
                     "start_message": tr("api.external_data.community_rules_started", "社区规则库开始更新"),
-                    "reload": self._reload_community_rules,
                 },
                 "workshop_db": {
                     "path": settings.config.community_workshop_db_path,
@@ -6957,7 +7036,6 @@ class API:
                     "success_message": tr("api.external_data.workshop_db_done", "社区工坊数据库更新完毕！"),
                     "error_message": tr("api.external_data.workshop_db_failed", "社区工坊数据库更新失败！"),
                     "start_message": tr("api.external_data.workshop_db_started", "社区工坊数据库开始更新"),
-                    "reload": self._reload_workshop_database,
                 },
                 "instead_db": {
                     "path": settings.config.community_instead_db_path,
@@ -6965,7 +7043,6 @@ class API:
                     "success_message": tr("api.external_data.instead_db_done", "替代 Mod 数据库更新完毕！"),
                     "error_message": tr("api.external_data.instead_db_failed", "替代 Mod 数据库更新失败！"),
                     "start_message": tr("api.external_data.instead_db_started", "替代 Mod 数据库开始更新"),
-                    "reload": self._reload_instead_database,
                 },
                 "multiplayer_compatibility": {
                     "path": settings.config.multiplayer_compatibility_path,
@@ -6973,7 +7050,6 @@ class API:
                     "success_message": tr("api.external_data.multiplayer_compatibility_done", "Multiplayer 兼容表更新完毕！"),
                     "error_message": tr("api.external_data.multiplayer_compatibility_failed", "Multiplayer 兼容表更新失败！"),
                     "start_message": tr("api.external_data.multiplayer_compatibility_started", "Multiplayer 兼容表开始更新"),
-                    "reload": self.multiplayer_compat_mgr.format_official_compatibility_file,
                 },
                 "mp_compat_package_ids": {
                     "path": settings.config.mp_compat_package_ids_path,
@@ -6981,7 +7057,6 @@ class API:
                     "success_message": tr("api.external_data.mp_compat_package_ids_done", "Multiplayer Compatibility 适配缓存生成完毕！"),
                     "error_message": tr("api.external_data.mp_compat_package_ids_failed", "Multiplayer Compatibility 适配缓存生成失败！"),
                     "start_message": tr("api.external_data.mp_compat_package_ids_started", "Multiplayer Compatibility 适配缓存开始生成"),
-                    "generator": self.multiplayer_compat_mgr.update_mp_compat_package_ids,
                 },
             }
             spec = dataset_specs.get(data_type)
@@ -6997,6 +7072,8 @@ class API:
             url = str(spec["url"] or "")
             if not full_path or not url:
                 return ApiResponse.error(tr("api.external_data.path_or_url_missing", "更新地址或目标路径未配置"))
+            full_path = str(Path(full_path).resolve())
+            source_url = url
 
             file_folder = os.path.dirname(full_path)
             file_name = os.path.basename(full_path)
@@ -7005,36 +7082,37 @@ class API:
 
             logger.info("开始更新外部数据。type=%s url=%s target=%s", data_type, url, full_path)
 
-            generator = spec.get("generator")
-            if callable(generator):
-                result = generator(source_url=url, target_path=full_path)
-                EventBus.send_toast(spec["success_message"], type="success")
-                return ApiResponse.success(
-                    data={"completed": True, **(result if isinstance(result, dict) else {})},
-                    message=spec["success_message"],
-                )
+            prepared_holder: dict[str, Any] = {}
+
+            def prepare(path: str, cancel_check=None):
+                if cancel_check:
+                    cancel_check()
+                if data_type == "community_rules":
+                    prepared = RuleManager.prepare_community_rules(Path(path))
+                elif data_type in {"workshop_db", "instead_db"}:
+                    prepared = self.workshop_db_mgr.prepare_dataset(data_type, Path(path))
+                elif data_type == "multiplayer_compatibility":
+                    prepared = {"payload": self.multiplayer_compat_mgr.prepare_official_compatibility(Path(path))}
+                elif data_type == "mp_compat_package_ids":
+                    prepared = {"payload": self.multiplayer_compat_mgr.prepare_mp_compat_cache(Path(path), source_url, cancel_check=cancel_check)}
+                else:
+                    return True
+                if cancel_check:
+                    cancel_check()
+                prepared_holder["value"] = prepared
+                return True
 
             def on_db_ready(task):
-                try:
-                    reload_fn = spec.get("reload")
-                    if callable(reload_fn):
-                        reload_fn()
-                    EventBus.send_toast(spec["success_message"], type="success")
-                except Exception as reload_error:
-                    logger.error(
-                        "外部数据下载完成，但重载缓存失败。type=%s",
-                        data_type,
-                        extra={"error_code": "EXTERNAL_DATA.RELOAD_FAILED", "extra_context": {"data_type": data_type}},
-                        exc_info=True,
-                    )
-                    EventBus.send_toast(
-                        tr("api.external_data.reload_failed_after_success", "{message} 但重载失败，请稍后手动刷新。", message=spec["success_message"]),
-                        type="warning",
-                    )
+                EventBus.send_toast(spec["success_message"], type="success")
 
-            def on_db_error(task):
-                pass
+            def commit(task):
+                prepared = prepared_holder["value"]
+                if data_type in {"multiplayer_compatibility", "mp_compat_package_ids"}:
+                    write_json_atomic(task.metadata["staged_path"], prepared["payload"], indent=2)
+                self._commit_external_data(task, data_type, Path(full_path), prepared)
 
+            if data_type == "mp_compat_package_ids":
+                url = self.multiplayer_compat_mgr._normalize_source_archive_url(url)
             capability = self.github_mgr.github_url_capability(url) or "raw"
             candidates = self.github_mgr._github_download_candidates(url)
             url, *fallback_urls = candidates
@@ -7043,12 +7121,13 @@ class API:
                 dest_dir=file_folder,
                 filename=file_name,
                 fallback_urls=fallback_urls,
-                validate_download=lambda path: json.loads(Path(path).read_text(encoding="utf-8-sig")),
+                validate_download_with_cancel=prepare,
+                on_post_download=commit,
                 on_source_result=lambda source, success: self.github_mgr.record_mirror_result(source, success=success, capability=capability),
                 on_complete=on_db_ready,
-                on_error=on_db_error,
                 title=spec["start_message"],
-                metadata={"external_data_type": data_type},
+                metadata={"external_data_type": data_type, "defer_replace": True},
+                network_override=network_mgr.snapshot_config(), destination_key="external-data:" + normalize_path_for_compare(full_path),
             )
 
             return ApiResponse.success(data={"task_id": task_id}, message=spec["start_message"])

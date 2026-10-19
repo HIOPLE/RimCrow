@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
 from urllib.parse import urlsplit
+from urllib.request import getproxies
 
 try:
     from pip_system_certs.wrapt_requests import inject_truststore
@@ -273,6 +274,14 @@ class NetworkManager:
                 return True
         return False
 
+    def snapshot_config(self) -> dict[str, Any]:
+        """任务固定代理与有效 Hosts，不修改系统环境或运行配置。"""
+        network = asdict(settings.config.network)
+        network["effective_hosts"] = dict(self._effective_hosts())
+        network["environment_proxies"] = dict(getproxies())
+        network["certificate_bundle"] = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("CURL_CA_BUNDLE")
+        return network
+
     def request_route(self, url: str, *, network_override: dict[str, Any] | None = None) -> dict[str, Any]:
         """返回单个 URL 的连接决策；镜像由调用方先生成，这里只决定代理和 Hosts。"""
         parsed = urlsplit(str(url or "").strip())
@@ -285,7 +294,12 @@ class NetworkManager:
         # 绕过列表只属于应用代理；关闭应用代理时，requests 仍应按外部环境代理工作。
         bypassed = bool(app_proxy_enabled and self._host_matches_bypass(host, bypass_list))
         if not app_proxy_enabled:
-            proxy_url = requests.utils.select_proxy(str(url), requests.utils.get_environ_proxies(str(url))) or ""
+            environment = network.get("environment_proxies") if network is not None else None
+            if isinstance(environment, dict):
+                bypassed = requests.utils.should_bypass_proxies(str(url), no_proxy=str(environment.get("no") or ""))
+                proxy_url = "" if bypassed else requests.utils.select_proxy(str(url), environment) or ""
+            else:
+                proxy_url = requests.utils.select_proxy(str(url), requests.utils.get_environ_proxies(str(url))) or ""
         active_hosts = self._effective_hosts() if network is None else self._preview_hosts(network)
         hosts_ip = active_hosts.get(host, "")
         return {
@@ -306,8 +320,11 @@ class NetworkManager:
             proxies = {}
             session.proxies = proxies
         proxies.clear()
-        session.trust_env = not decision["proxy_enabled"]
-        if decision["proxy_enabled"] and not decision["proxy_bypassed"]:
+        has_environment_snapshot = network_override is not None and "environment_proxies" in network_override
+        session.trust_env = not decision["proxy_enabled"] and not has_environment_snapshot
+        if has_environment_snapshot and network_override.get("certificate_bundle"):
+            session.verify = network_override["certificate_bundle"]
+        if decision["proxy_url"] and not decision["proxy_bypassed"]:
             session.proxies.update({"http": decision["proxy_url"], "https": decision["proxy_url"]})
         return decision
 
@@ -936,6 +953,17 @@ def build_retry_session(*, total: int = 3, connect: int = 3, read: int = 3, redi
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
+
+
+def remaining_request_timeout(deadline: float | None, cancel_event: threading.Event | None = None) -> tuple[float, float]:
+    """外部数据请求扣同一预算；不把连接/读空闲超时冒充硬取消。"""
+    # shortcut: Requests 阻塞 I/O 可能超出预算，可取消传输经验证后再升级为硬截止。
+    if cancel_event is not None and cancel_event.is_set():
+        raise InterruptedError("Task cancelled by user")
+    remaining = deadline - time.monotonic() if deadline is not None else 20.0
+    if remaining <= 0:
+        raise TimeoutError("外部数据检查已超时")
+    return min(5.0, remaining), min(10.0, remaining)
 
 
 def merge_headers(headers: dict[str, str] | None = None, *, user_agent: str = DEFAULT_USER_AGENT) -> dict[str, str]:

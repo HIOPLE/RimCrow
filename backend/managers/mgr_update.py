@@ -97,6 +97,8 @@ class UpdateInfo:
     sources: Optional[List[Dict[str, Any]]] = None
     check_status: str = "ok"
     source_results: Optional[List[Dict[str, Any]]] = None
+    # 更新检查请求的往返耗时；仅用于来源排序，不代表完整下载速度。
+    latency_ms: Optional[int] = None
 
     def to_source_dict(self):
         data = asdict(self)
@@ -752,7 +754,7 @@ class UpdateManager:
 
     def _check_sources(self) -> UpdateInfo:
         """
-        并发检查各源，按版本和配置顺序汇总结果。
+        并发检查各源，按版本汇总；同版本来源优先选择检查耗时更低者。
         聚合检查逻辑：
         1. 检查远程源是否有新版本。
         2. 如果有远程新版本，检查本地 Cache 是否已经下载了该版本。
@@ -764,11 +766,27 @@ class UpdateManager:
         remote_success_count = 0
         remote_failure_count = 0
         
-        # 并发只改变等待方式；按配置顺序收集，不能让响应速度改变下载优先级。
+        # 并发只改变等待方式；结果仍按配置顺序收集，来源优先级由真实请求耗时决定。
         stop_requested = threading.Event()
         deadline = time.monotonic() + UPDATE_CHECK_TIMEOUT_SECONDS
         pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="update-check")
-        jobs = [pool.submit(_check_update_source, copy.copy(src), stop_requested, deadline) for src in self.sources]
+        jobs = []
+        job_started_at = {}
+
+        def check_source_with_latency(source):
+            started_at = time.monotonic()
+            try:
+                info, detail = _check_update_source(source, stop_requested, deadline)
+            except Exception as error:
+                error.update_latency_ms = max(0, int((time.monotonic() - started_at) * 1000))
+                raise
+            return info, detail, max(0, int((time.monotonic() - started_at) * 1000))
+
+        for src in self.sources:
+            started_at = time.monotonic()
+            future = pool.submit(check_source_with_latency, copy.copy(src))
+            jobs.append(future)
+            job_started_at[future] = started_at
         try:
             done, _ = wait(jobs, timeout=UPDATE_CHECK_TIMEOUT_SECONDS)
         finally:
@@ -782,8 +800,10 @@ class UpdateManager:
             try:
                 if future not in done:
                     raise requests.Timeout("更新源未在检查时限内完成")
-                info, detail = future.result()
+                info, detail, latency_ms = future.result()
+                detail = {**detail, "latency_ms": latency_ms}
                 if info and info.has_update:
+                    info.latency_ms = latency_ms
                     parsed_version = version.parse(info.version)
                     candidates.append((parsed_version, info))
                     source_results.append({"source_name": source_name, **detail, "status": "update", "version": info.version})
@@ -795,7 +815,8 @@ class UpdateManager:
                 logger.error(f"检查更新源失败: source={src.__class__.__name__}, error={e}")
                 classified = classify_exception(e, module="update", action="source_check")
                 error_message = classified.user_message or tr("errors.update.source_check_failed", "检查更新源失败。请检查网络连接、代理设置或稍后重试。")
-                source_results.append({"source_name": source_name, "status": "failed", "error": str(error_message),
+                latency_ms = getattr(e, "update_latency_ms", max(0, int((time.monotonic() - job_started_at[future]) * 1000)))
+                source_results.append({"source_name": source_name, "status": "failed", "error": str(error_message), "latency_ms": latency_ms,
                     "error_code": classified.error_code if classified.user_message else "UPDATE.SOURCE_CHECK_FAILED",
                     "message_key": classified.message_key or error_message.message_key,
                     "message_params": classified.message_params if classified.user_message else error_message.message_params})
@@ -824,6 +845,8 @@ class UpdateManager:
                 candidate = self._update_info_from_source(raw_source)
                 if not candidate or candidate.version != latest_version or not candidate.download_url:
                     continue
+                if candidate.latency_ms is None:
+                    candidate.latency_ms = item.latency_ms
                 key = self._source_key(candidate.to_source_dict())
                 if key in seen_source_keys:
                     continue
@@ -850,9 +873,21 @@ class UpdateManager:
                     network_mode=latest_sources[0].network_mode,
                     local_status="ready",
                     local_file_path=cached_path,
+                    latency_ms=0,
                 )
                 latest_sources.insert(0, cached_info)
 
+        # 同版本来源按检查往返耗时排序；本地缓存永远优先，未知耗时保持原配置顺序。
+        latest_sources = sorted(
+            enumerate(latest_sources),
+            key=lambda pair: (
+                0 if pair[1].local_status == "ready" else 1,
+                pair[1].latency_ms is None,
+                pair[1].latency_ms if pair[1].latency_ms is not None else 0,
+                pair[0],
+            ),
+        )
+        latest_sources = [item for _, item in latest_sources]
         selected = latest_sources[0]
         selected.sources = [item.to_source_dict() for item in latest_sources]
         selected.check_status = "partial" if remote_failure_count else "ok"
@@ -890,7 +925,7 @@ class UpdateManager:
         return None
 
     
-    def perform_update_download(self, target_version: str = '') -> Dict:
+    def perform_update_download(self, target_version: str = '', source_url: str = '') -> Dict:
         """
         执行更新下载流程 (前端点击‘立即更新’后调用)
         """
@@ -902,6 +937,23 @@ class UpdateManager:
         
         if not info.has_update:
             raise Exception(str(tr("errors.update.no_available_update", "没有可用的更新")))
+
+        if source_url:
+            selected_source = next(
+                (source for source in self._sources_for_info(info)
+                 if source.get("version") == info.version and source.get("download_url") == source_url),
+                None,
+            )
+            if not selected_source:
+                raise ValueError("指定的更新来源已不可用，请重新检查更新。")
+            selected_info = self._update_info_from_source(selected_source)
+            if not selected_info:
+                raise ValueError("指定的更新来源已不可用，请重新检查更新。")
+            selected_info.sources = self._sources_for_info(info)
+            selected_info.source_results = info.source_results
+            selected_info.check_status = info.check_status
+            info = selected_info
+            self.current_update_info = info
 
         if self.active_download_task_id and self.active_download_version == info.version:
             return {"status": "downloading", "task_id": self.active_download_task_id}
@@ -1135,6 +1187,7 @@ class UpdateManager:
             sources=sources,
             check_status=str(source.get("check_status") or "ok"),
             source_results=source.get("source_results"),
+            latency_ms=source.get("latency_ms"),
         )
 
     def _save_metadata_file(self, info: UpdateInfo):

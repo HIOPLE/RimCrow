@@ -15,7 +15,7 @@ const setup = (api = {}) => {
 }
 const update = () => ({
   has_update: true, version: '1.2.3', source_name: 'SourceForge', local_status: 'remote', file_size: '70 MB', check_status: 'partial',
-  sources: [{ source_name: 'SourceForge', version: '1.2.3', changelog: 'Latest package' }, { source_name: 'GitHub', version: '1.2.3', changelog: '## Changes\nOne release' }],
+  sources: [{ source_name: 'SourceForge', version: '1.2.3', download_url: 'https://sourceforge.example/app.zip', changelog: 'Latest package' }, { source_name: 'GitHub', version: '1.2.3', download_url: 'https://github.example/app.zip', changelog: '## Changes\nOne release' }],
   source_results: [{ source_name: 'SourceForge', status: 'update', version: '1.2.3' }, { source_name: 'GitHub', status: 'update', version: '1.2.3', access_path: 'builtin_mirror' }, { source_name: 'Gitee', status: 'failed' }],
 })
 
@@ -32,6 +32,7 @@ test('one release has one item and one action group; checking ends before prompt
   assert.equal(item.actions.length, 0)
   assert.equal(item.details.length, 3)
   assert.equal(confirm.state.actionButtons.length, 2)
+  assert.deepEqual(confirm.state.actionSelector.options.map(option => option.value), ['', 'https://sourceforge.example/app.zip', 'https://github.example/app.zip'])
   assert.ok(state.lastCheckedAt)
   confirm.chooseAction({ scope: 'bulk', action: 'skip' })
   await pending
@@ -64,7 +65,7 @@ test('both installation confirmations are required, and either may cancel', asyn
     useConfirmStore().confirmAction = async (...args) => { calls.push(args); return answers[calls.length - 1] }
     await actions._showInstallPrompt({ path: 'F:/updates/app.zip', version: '1.2.3' })
     assert.equal(calls.length, answers.length)
-    assert.deepEqual(triggered, answers.every(Boolean) ? [['1.2.3', true]] : [])
+    assert.deepEqual(triggered, answers.every(Boolean) ? [['1.2.3', true, '']] : [])
   }
 })
 
@@ -76,7 +77,7 @@ test('stale prompt cannot start a different release', async () => {
   usePromptQueueStore().enqueue = async value => { prompt = value }
   await actions.showAvailableUpdate()
   state.info = { ...update(), version: '1.2.4' }
-  await prompt.onBulkAction('update')
+  await prompt.onBulkAction('download')
   assert.equal(triggered, false)
 })
 
@@ -89,7 +90,7 @@ test('a fast completion is not overwritten by the download response', async () =
   let prompt
   usePromptQueueStore().enqueue = async value => { prompt = value }
   await actions.showAvailableUpdate()
-  await prompt.onBulkAction('update')
+  await prompt.onBulkAction('download')
   assert.equal(state.info.local_status, 'ready')
 })
 
@@ -105,9 +106,9 @@ test('a ready response to a download request still requires both confirmations',
   const titles = []
   useConfirmStore().confirmAction = async title => { titles.push(title); return titles.length === 1 }
   await actions.showAvailableUpdate()
-  await prompt.onBulkAction('update')
+  await prompt.onBulkAction('download')
   assert.equal(titles.length, 2)
-  assert.deepEqual(triggered, [['1.2.3', false]])
+  assert.deepEqual(triggered, [['1.2.3', false, '']])
 })
 
 test('source details distinguish older releases, missing packages and missing releases', () => {
@@ -118,6 +119,30 @@ test('source details distinguish older releases, missing packages and missing re
   ] })
   assert.match(details[0].value, /1\.2\.2/)
   assert.notEqual(details[1].value, details[2].value)
+})
+
+test('source details show the concrete available version', () => {
+  const details = getUpdateSourceDetails({ ...update(), source_results: [
+    { source_name: 'GitHub', status: 'update', version: '1.2.3' },
+  ] })
+  assert.match(details[0].value, /1\.2\.3/)
+})
+
+test('download selector defaults to automatic and accepts an explicit source', async () => {
+  const triggered = []
+  const { state, actions } = setup({ update_trigger_action: async (...args) => {
+    triggered.push(args)
+    return { status: 'success', data: {} }
+  } })
+  state.info = update()
+  let prompt
+  usePromptQueueStore().enqueue = async value => { prompt = value }
+  await actions.showAvailableUpdate()
+  assert.equal(prompt.bulkActions[0].id, 'download')
+  assert.equal(prompt.actionSelector.value, '')
+  assert.deepEqual(prompt.actionSelector.options.map(option => option.label), ['自动选择（推荐）', 'SourceForge', 'GitHub'])
+  await prompt.onBulkAction('download', [], prompt, 'https://github.example/app.zip')
+  assert.deepEqual(triggered, [['1.2.3', false, 'https://github.example/app.zip']])
 })
 
 test('release notes from all publishing sources use rich rendering', async () => {

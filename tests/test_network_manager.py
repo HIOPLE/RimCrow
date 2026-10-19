@@ -381,8 +381,9 @@ class TestNetworkManagerHostsCleanup(unittest.TestCase):
             "images.steamusercontent.com", "steamuserimages-a.akamaihd.net",
             "steamcommunity.com", "api.steampowered.com", "gitgud.io",
             "steamcdn-a.akamaihd.net", "client-update.steamstatic.com",
-            "dl.steam.clngaa.com", "st.dl.eccdnx.com", "xz.pphimalayanrt.com",
+            "dl.steam.clngaa.com", "st.dl.eccdnx.com",
         }.issubset(domains))
+        self.assertNotIn("xz.pphimalayanrt.com", domains)
         self.assertNotIn("wwbns.lanzouu.com", domains)
         self.assertTrue(domains.isdisjoint({
             "avatars.steamstatic.com", "avatars.fastly.steamstatic.com", "community.fastly.steamstatic.com",
@@ -396,7 +397,6 @@ class TestNetworkManagerHostsCleanup(unittest.TestCase):
             "steamcmd_update": "https://client-update.steamstatic.com/steam_cmd_win32",
             "steamcmd_cdn_clngaa": "http://dl.steam.clngaa.com/",
             "steamcmd_cdn_eccdnx": "http://st.dl.eccdnx.com/",
-            "steamcmd_cdn_pphimalayanrt": "http://xz.pphimalayanrt.com/",
         })
         sourceforge = next(item for item in result["targets"] if item["id"] == "sourceforge")
         gitee = next(item for item in result["targets"] if item["id"] == "gitee")

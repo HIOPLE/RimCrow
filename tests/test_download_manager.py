@@ -254,6 +254,24 @@ class DownloadManagerProtocolTests(unittest.TestCase):
         self.assertEqual(task.status, TaskStatus.COMPLETED)
         self.assertEqual(target.read_bytes(), b"data")
 
+    def test_hash_verification_observes_cancellation(self):
+        target = self.temp_dir / "large.bin"
+        target.write_bytes(b"x" * (8192 * 3))
+        checks = 0
+
+        def cancel_check():
+            nonlocal checks
+            checks += 1
+            if checks == 2:
+                raise InterruptedError("cancelled")
+
+        with self.assertRaises(InterruptedError):
+            self.manager._verify_hash(
+                str(target), hashlib.sha256(b"x" * (8192 * 3)).hexdigest(),
+                "sha256", cancel_check=cancel_check,
+            )
+        self.assertGreaterEqual(checks, 2)
+
     def test_business_validation_failure_retries_fallback_before_replacing_file(self):
         seen = []
 

@@ -155,6 +155,29 @@ def test_mp_compat_package_ids_can_be_generated_from_source_archive(tmp_path):
     assert result["source_id"] == "abcdef1234567890"
 
 
+def test_mp_compat_cache_generation_observes_cancellation(tmp_path):
+    archive_path = tmp_path / "source.zip"
+    archive_path.write_bytes(_source_archive({
+        "repo/Source/Example.cs": '[MpCompatFor("Example.Mod")]',
+        "repo/Source/Other.cs": '[MpCompatFor("Other.Mod")]',
+    }))
+    manager = MultiplayerCompatibilityManager()
+    checks = 0
+
+    def cancel_check():
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            raise InterruptedError("cancelled")
+
+    with pytest.raises(InterruptedError):
+        manager.prepare_mp_compat_cache(
+            archive_path, "https://github.com/rwmt/Multiplayer-Compatibility/archive.zip",
+            cancel_check=cancel_check,
+        )
+    assert checks >= 2
+
+
 @pytest.mark.parametrize("mirror_content", [b"__invalid_zip__", b"<html>login</html>"])
 def test_github_source_archive_falls_back_for_invalid_mirror_response(mirror_content):
     manager = MultiplayerCompatibilityManager()

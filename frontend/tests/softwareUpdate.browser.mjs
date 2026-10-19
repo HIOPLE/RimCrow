@@ -20,7 +20,7 @@ import { setLocale } from '/src/shared/i18n.js'
 import '/src/app/styles/style.css'
 window.info = {
   has_update: true, version: '1.2.3', source_name: 'SourceForge', file_size: '70 MB', local_status: 'remote', check_status: 'partial',
-  sources: [{source_name:'SourceForge',version:'1.2.3',changelog:'Latest package'}, {source_name:'GitHub',version:'1.2.3',changelog:${JSON.stringify(releaseNotes)}}],
+  sources: [{source_name:'SourceForge',version:'1.2.3',download_url:'https://sourceforge.example/app.zip',changelog:'Latest package'}, {source_name:'GitHub',version:'1.2.3',download_url:'https://github.example/app.zip',changelog:${JSON.stringify(releaseNotes)}}],
   source_results: [{source_name:'SourceForge',status:'update',version:'1.2.3'}, {source_name:'GitHub',status:'update',version:'1.2.3',access_path:'builtin_mirror'}, {source_name:'Gitee',status:'failed',error:'暂时无法检查'}],
 }
 window.reply = window.info
@@ -71,11 +71,29 @@ try {
   await dialog.locator('.prompt-description-rich h3').first().waitFor()
   assert.ok(await dialog.locator('.prompt-description-rich ol li').count() > 0)
   await dialog.getByText('来源详情', { exact: true }).click()
-  await dialog.getByText('已发现此版本 · 通过内置镜像读取', { exact: true }).waitFor()
+  await dialog.getByText('发现新版本 v1.2.3 · 通过内置镜像读取', { exact: true }).waitFor()
+  await dialog.getByText('下载来源', { exact: true }).waitFor()
+  await dialog.getByText('下载来源', { exact: true }).click()
+  assert.equal(await page.getByRole('button', { name: '自动选择（推荐）', exact: true }).count(), 1)
+  assert.equal(await page.getByRole('button', { name: 'SourceForge', exact: true }).count(), 1)
+  assert.equal(await page.getByRole('button', { name: 'GitHub', exact: true }).count(), 1)
+  // 必须实际命中选项，元素存在并不能证明没有被确认弹窗遮挡。
+  await page.getByRole('button', { name: 'GitHub', exact: true }).click()
+  assert.equal(await page.evaluate(() => window.confirms.state.actionSelector.value), 'https://github.example/app.zip')
+  assert.equal(await page.evaluate(() => window.confirms.isVisible), true)
+  await dialog.getByText('下载来源', { exact: true }).click()
+  await page.keyboard.press('Escape')
+  assert.equal(await page.evaluate(() => window.confirms.isVisible), true)
+  await dialog.getByText('下载来源', { exact: true }).click()
+  await page.getByRole('button', { name: '自动选择（推荐）', exact: true }).click()
+  await dialog.getByRole('button', { name: '下载更新', exact: true }).waitFor()
   if (process.env.UPDATE_SCREENSHOT_DIR) {
     await mkdir(process.env.UPDATE_SCREENSHOT_DIR, { recursive: true })
     await dialog.locator('.overflow-y-auto').last().evaluate(el => { el.scrollTop = 0 })
-    await page.screenshot({ path: `${process.env.UPDATE_SCREENSHOT_DIR}/software-update-desktop.png` })
+    await dialog.getByText('下载来源', { exact: true }).click()
+    await page.getByRole('button', { name: 'GitHub', exact: true }).waitFor()
+    await page.screenshot({ path: `${process.env.UPDATE_SCREENSHOT_DIR}/software-update-desktop.png`, animations: 'disabled' })
+    await page.keyboard.press('Escape')
   }
   await page.getByRole('button', { name: '以后再说', exact: true }).click()
   await page.getByRole('button', { name: '查看更新', exact: true }).click()
@@ -125,6 +143,20 @@ try {
     assert.equal(await page.evaluate(() => window.unsafeUpdateNote), undefined)
     await page.getByRole('button', { name: '以后再说', exact: true }).click()
   }
+  // Mini 确认框的外部点击判定也必须把所属面板算作内部。
+  await page.evaluate(() => {
+    void window.confirms.open({
+      title: 'Mini selector check', mode: 'confirm',
+      actionSelector: { label: 'Mini source', value: 'auto', options: [
+        { label: 'Mini automatic', value: 'auto' }, { label: 'Mini manual', value: 'manual' },
+      ] },
+    }, document.querySelector('button'))
+  })
+  await page.getByRole('dialog', { name: 'Mini selector check' }).getByText('Mini source', { exact: true }).click()
+  await page.getByRole('button', { name: 'Mini manual', exact: true }).click()
+  assert.equal(await page.evaluate(() => window.confirms.isVisible), true)
+  assert.equal(await page.evaluate(() => window.confirms.state.actionSelector.value), 'manual')
+  await page.getByRole('button', { name: '取消', exact: true }).click()
   assert.deepEqual(errors, [])
   console.log('Software update browser checks passed: single release, source details, two confirmations, small viewport, Markdown + HTML and sanitization across five sources.')
 } finally {

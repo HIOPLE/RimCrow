@@ -8,6 +8,18 @@ const getUpdateSources = (info = {}) => {
   return sources.filter(source => String(source?.version || info.version || '') === String(info.version || ''))
 }
 
+const getUpdateSourceOptions = (info = {}) => {
+  const seen = new Set()
+  const options = [{ label: t('ui.update.source_auto', '自动选择（推荐）'), value: '' }]
+  for (const source of getUpdateSources(info)) {
+    const value = String(source?.download_url || '')
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    options.push({ label: source.source_name || t('common.source.unknown', '未知来源'), value })
+  }
+  return options
+}
+
 export const getUpdateSourceDetails = (info = {}) => {
   if (!info.source_results?.length && !info.has_update) return []
   const results = info.source_results?.length ? info.source_results : getUpdateSources(info).map(source => ({ ...source, status: 'update' }))
@@ -17,7 +29,7 @@ export const getUpdateSourceDetails = (info = {}) => {
     else if (result.status === 'no_package') value = t('ui.update.source_no_package', '没有适用的安装包')
     else if (result.status === 'no_release') value = t('ui.update.source_no_release', '尚未发布版本')
     else if (result.version && info.has_update && result.version !== info.version) value = t('ui.update.source_older', '尚未同步目标版本（v{version}）', { version: result.version })
-    else if (result.status === 'update') value = t('ui.update.source_available', '已发现此版本')
+    else if (result.status === 'update') value = t('ui.update.source_available', '发现新版本 v{version}', { version: result.version || info.version })
     else value = t('ui.update.source_no_update', '未发现新版本')
     if (result.access_path === 'builtin_mirror') value += t('ui.update.via_builtin_mirror', ' · 通过内置镜像读取')
     return { label: result.source_name || t('common.source.unknown', '未知来源'), value }
@@ -74,15 +86,25 @@ export const useUpdateActions = ({
         type: 'success',
         priority: manual ? 20 : 50,
         items: buildUpdatePromptItems(info),
+        actionSelector: info.local_status === 'ready' ? null : {
+          label: t('ui.update.source_selector', '下载来源'),
+          value: '',
+          options: getUpdateSourceOptions(info),
+        },
         bulkActions: [
-          { id: 'update', label: info.local_status === 'ready' ? t('ui.update.install_now', '立即安装') : t('ui.update.download_update', '下载更新'), kind: 'primary' },
+          ...(info.local_status === 'ready'
+            ? [{ id: 'update', label: t('ui.update.install_now', '立即安装'), kind: 'primary' }]
+            : [{ id: 'download', label: t('ui.update.download_update', '下载更新'), kind: 'primary' }]),
           { id: 'skip', label: t('ui.update.later', '以后再说'), kind: 'secondary' },
           ...(!manual ? [{ id: 'ignore', label: t('ui.update.ignore_version', '忽略此版本'), kind: 'secondary' }] : []),
         ],
-        onBulkAction: async (actionId) => {
+        onBulkAction: async (actionId, _items, _prompt, selection = '') => {
           if (actionId === 'update') {
             if (info.local_status === 'ready') await _showInstallPrompt({ path: info.local_file_path, version: info.version })
-            else await _performUpdateAction(info.version)
+          }
+          else if (actionId === 'download') {
+            const selectedSource = getUpdateSources(info).find(source => source.download_url === selection) || null
+            await _performUpdateAction(info.version, selectedSource)
           }
           else if (actionId === 'ignore') await window.pywebview.api.update_ignore_version(info.version)
         },
@@ -161,7 +183,7 @@ export const useUpdateActions = ({
   }
 
   // 触发操作 (下载 OR 安装)
-  const _performUpdateAction = async (expectedVersion = updateState.info?.version) => {
+  const _performUpdateAction = async (expectedVersion = updateState.info?.version, selectedSource = null) => {
     const info = updateState.info
     if (!info) return
     if (expectedVersion !== info.version) return toast.warning(t('ui.update.result_changed', '更新信息已变化，请重新查看更新。'))
@@ -179,7 +201,7 @@ export const useUpdateActions = ({
     }
 
     // 调用统一接口
-    const res = await window.pywebview.api.update_trigger_action(expectedVersion, isInstallConfirmed)
+    const res = await window.pywebview.api.update_trigger_action(expectedVersion, isInstallConfirmed, selectedSource?.download_url || '')
     if (checkResult(res, t('check.update.start_download', '开始下载更新包'))) {
       if (res.data?.status === 'ready') {
         info.local_status = 'ready'

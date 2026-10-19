@@ -181,13 +181,22 @@
           <div class="modal-footer flex shrink-0 flex-wrap items-center justify-end gap-2"
             :class="isMini ? 'px-2 py-1' : 'px-4 py-2'">
 
+            <div v-if="confirmStore.state.actionSelector?.options?.length > 1" class="mr-auto min-w-36 max-w-60">
+              <CommonSelect
+                v-model="confirmStore.state.actionSelector.value"
+                :label="confirmStore.state.actionSelector.label"
+                :options="confirmStore.state.actionSelector.options"
+                mini
+              />
+            </div>
+
             <!-- 自定义底部按钮用于“全部处理/全部稍后”等窗口级动作，保持普通确认弹窗的旧按钮逻辑不变。 -->
             <template v-if="Array.isArray(confirmStore.state.actionButtons) && confirmStore.state.actionButtons.length > 0">
               <button
                 v-for="action in confirmStore.state.actionButtons"
                 :key="action.value?.action || action.label"
                 :disabled="confirmStore.state.isResolving"
-                @click="confirmStore.chooseAction(action.value)"
+                @click="chooseFooterAction(action)"
                 class="rounded-lg text-xs font-bold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                 :class="[
                   isMini ? 'px-2 py-1' : 'px-4 py-1.5',
@@ -235,6 +244,7 @@
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue'
 import { useConfirmStore } from './confirmStore'
+import CommonSelect from '../input/CommonSelect.vue'
 import { UI_Z_INDEX } from '../../lib/constants.js'
 import { useAppStore } from '../../../app/stores/appStore'
 import { onClickOutside, useWindowSize } from '@vueuse/core'
@@ -252,6 +262,15 @@ const Icons = {
 const appStore = useAppStore()
 const confirmStore = useConfirmStore()
 const { width: winW, height: winH } = useWindowSize()
+
+const chooseFooterAction = (action) => {
+  if (!confirmStore.state.actionSelector) return confirmStore.chooseAction(action.value)
+  const selection = confirmStore.state.actionSelector.value
+  const value = action.value
+  confirmStore.chooseAction(value && typeof value === 'object' && !Array.isArray(value)
+    ? { ...value, selection }
+    : { value, selection })
+}
 
 const modalRef = ref(null)
 const inputRef = ref(null)

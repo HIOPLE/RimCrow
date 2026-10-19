@@ -6,6 +6,7 @@ import uuid
 import hashlib
 import shutil
 import threading
+import copy
 import requests
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
@@ -57,11 +58,15 @@ class DownloadTask:
     on_error: Optional[Callable[['DownloadTask'], Any]] = None
     # 业务层内容校验；失败时当前候选源应继续回退。
     validate_download: Optional[Callable[[str], Any]] = None
+    # 需要在长校验过程中观察任务取消时使用；保留单参数回调兼容现有调用方。
+    validate_download_with_cancel: Optional[Callable[[str, Callable[[], None]], Any]] = None
     # 备用源由业务层生成；下载器只按顺序尝试，不识别来源类型。
     source_urls: list[str] = field(default_factory=list)
     on_source_result: Optional[Callable[[str, bool], Any]] = None
     # managed 走应用路由；direct 不注入应用代理或环境代理。
     network_mode: str = "managed"
+    network_override: Optional[Dict[str, Any]] = None
+    destination_key: str = ""
     use_response_filename: bool = False
     network_attempts: list[dict[str, Any]] = field(default_factory=list)
     task_type: str = "download"
@@ -107,7 +112,9 @@ class DownloadManager:
                  on_post_download: Optional[Callable[[DownloadTask], Any]] = None,
                  on_source_result: Optional[Callable[[str, bool], Any]] = None,
                  validate_download: Optional[Callable[[str], Any]] = None,
-                 network_mode: str = "managed") -> str:
+                 validate_download_with_cancel: Optional[Callable[[str, Callable[[], None]], Any]] = None,
+                 network_mode: str = "managed", network_override: Dict[str, Any] | None = None,
+                 destination_key: str = "") -> str:
         """
         添加下载任务
         :param url: 下载地址
@@ -116,7 +123,7 @@ class DownloadManager:
         :param expected_hash: 期望的 Hash 值 (可选，若提供则会自动校验)
         :param hash_algorithm: Hash 算法 (md5, sha1, sha256)
         :param on_complete: 下载完成后的回调函数 (在子线程执行，请勿操作 GUI)
-        :param on_post_download: 下载文件替换成功后、任务标记完成前执行的后处理回调
+        :param on_post_download: 完成前执行；外部数据延迟替换时由回调负责提交暂存文件
         :param on_error: 失败后的回调函数
         :param validate_download: 业务层内容校验；返回 False 或抛异常时继续尝试备用源
         """
@@ -145,13 +152,21 @@ class DownloadManager:
         task = DownloadTask( url=real_url, dest_path=final_path, filename=filename,
             expected_hash=expected_hash, hash_algorithm=hash_algorithm,
             on_complete=on_complete, on_post_download=on_post_download, on_error=on_error,
-            validate_download=validate_download,
+            validate_download=validate_download, validate_download_with_cancel=validate_download_with_cancel,
             source_urls=source_urls, on_source_result=on_source_result,
             network_mode="direct" if str(network_mode).strip().lower() == "direct" else "managed",
+            network_override=copy.deepcopy(network_override), destination_key=destination_key,
             use_response_filename=use_response_filename,
             task_type=task_type, title=resolved_title, metadata=dict(metadata or {})
         )
         with self._lock:
+            if destination_key:
+                for active in self.tasks.values():
+                    is_terminal = active.status in {TaskStatus.COMPLETED, TaskStatus.ERROR, TaskStatus.CANCELLED}
+                    is_released = is_terminal and (active._future is None or active._future.done())
+                    same_dataset = bool(task.metadata.get("external_data_type")) and task.metadata.get("external_data_type") == active.metadata.get("external_data_type")
+                    if (active.destination_key == destination_key or same_dataset) and not is_released:
+                        return active.task_id
             self.tasks[task.task_id] = task
         
         logger.info(f"已加入下载任务: filename={filename}, task_id={task.task_id}, hash_check={bool(expected_hash)}")
@@ -338,6 +353,7 @@ class DownloadManager:
             session = build_retry_session(
                 route_manager=False if is_direct else None,
                 trust_env=False if is_direct else None,
+                network_override=task.network_override,
             )
             
             # 2. 发起请求 (Stream模式)。备用源由业务层传入，下载器不识别来源类型。
@@ -353,6 +369,9 @@ class DownloadManager:
                 task.status = TaskStatus.RUNNING
                 task.downloaded_size = 0
                 task.total_size = 0
+                self._set_task_phase(task, None)
+                task.speed = "0 B/s"
+                self._emit_progress(task)
                 start_time = time.time()
                 last_emit_time = 0
                 attempt = {"url": self._safe_url_marker(active_url), "source_role": "fallback" if attempt_index else "primary"}
@@ -435,20 +454,27 @@ class DownloadManager:
                         raise requests.exceptions.ChunkedEncodingError(f"下载文件不完整：应收到 {expected_size} 字节，实际收到 {task.downloaded_size} 字节，请重试或切换下载来源。")
                     task.total_size = task.downloaded_size
 
+                    def check_cancel() -> None:
+                        if task._cancel_event.is_set():
+                            raise InterruptedError("Task cancelled by user")
+
                     if task.expected_hash:
                         task.status = TaskStatus.VERIFYING
                         task.speed = "正在校验"
                         self._emit_progress(task)
                         logger.debug("正在校验下载文件哈希: filename=%s", task.filename)
-                        if not self._verify_hash(temp_path, task.expected_hash, task.hash_algorithm):
+                        if not self._verify_hash(temp_path, task.expected_hash, task.hash_algorithm, cancel_check=check_cancel):
                             raise InvalidResponseError("文件哈希不一致，下载内容可能已损坏。")
 
-                    if task.validate_download:
+                    if task.validate_download or task.validate_download_with_cancel:
                         task.status = TaskStatus.VERIFYING
                         task.speed = "正在校验"
                         self._emit_progress(task)
                         try:
-                            is_valid = task.validate_download(temp_path)
+                            if task.validate_download_with_cancel:
+                                is_valid = task.validate_download_with_cancel(temp_path, check_cancel)
+                            else:
+                                is_valid = task.validate_download(temp_path)
                         except (InterruptedError, OSError):
                             raise
                         except Exception as validation_error:
@@ -458,8 +484,14 @@ class DownloadManager:
 
                     if task._cancel_event.is_set():
                         raise InterruptedError("Task cancelled by user")
-                    # 同目录替换失败时保留原文件，避免先删除旧文件造成数据丢失。
-                    os.replace(temp_path, task.dest_path)
+                    # 外部数据先在暂存文件上完成导入提交；其它任务保持原有替换顺序。
+                    deferred_replace = bool(task.metadata.get("defer_replace"))
+                    if deferred_replace and task.on_post_download:
+                        task.metadata["staged_path"] = temp_path
+                    elif deferred_replace:
+                        raise ValueError("延迟替换任务缺少提交回调")
+                    else:
+                        os.replace(temp_path, task.dest_path)
                     if task.on_source_result:
                         try:
                             task.on_source_result(active_url, True)
@@ -497,6 +529,8 @@ class DownloadManager:
                 task.speed = "正在处理"
                 self._emit_progress(task)
                 task.on_post_download(task)
+                if task.metadata.get("defer_replace") and not os.path.exists(task.dest_path):
+                    raise OSError("外部数据提交未生成目标文件")
             
             # 最后发送 COMPLETED，确保 100%
             self._set_task_phase(task, None)
@@ -578,12 +612,15 @@ class DownloadManager:
         if temporary_dir and Path(temporary_dir).name.startswith("git-task-") and Path(temporary_dir).resolve() == Path(task.dest_path).parent.resolve():
             shutil.rmtree(temporary_dir, ignore_errors=True)
 
-    def _verify_hash(self, file_path: str, expected: str, algo: str = "md5") -> bool:
+    def _verify_hash(self, file_path: str, expected: str, algo: str = "md5",
+                     cancel_check: Optional[Callable[[], None]] = None) -> bool:
         """校验文件 Hash"""
         try:
             h = hashlib.new(algo)
             with open(file_path, 'rb') as f:
                 while chunk := f.read(8192):
+                    if cancel_check:
+                        cancel_check()
                     h.update(chunk)
             calculated = h.hexdigest().lower()
             expected = expected.lower()
@@ -592,6 +629,8 @@ class DownloadManager:
                 logger.warning(f"下载文件哈希不一致: calculated={calculated}, expected={expected}")
                 return False
             return True
+        except InterruptedError:
+            raise
         except Exception as e:
             logger.error(f"下载文件哈希校验失败: path={file_path}, error={e}")
             return False

@@ -50,6 +50,18 @@ def test_confirmed_installation_does_not_start_a_new_download():
     api.update_mgr.perform_update_download.assert_not_called()
 
 
+def test_update_action_forwards_the_selected_source_url():
+    from backend.api import API
+    api = object.__new__(API)
+    api.update_mgr = Mock(current_update_info=UpdateInfo(True, "1.2.3", "", "https://example.org/default.zip", "Default"))
+    api.update_mgr.perform_update_download.return_value = {"status": "downloading", "task_id": "task-1"}
+
+    result = api.update_trigger_action("1.2.3", False, "https://example.org/alternate.zip")
+
+    assert result["status"] == "success"
+    api.update_mgr.perform_update_download.assert_called_once_with("1.2.3", "https://example.org/alternate.zip")
+
+
 def test_ignored_automatic_update_keeps_full_result(monkeypatch):
     from backend.api import API
     api = object.__new__(API)
@@ -523,7 +535,7 @@ class TestLanzouUpdatePackageNames(unittest.TestCase):
 
 
 class TestUpdateManagerSources(unittest.TestCase):
-    def test_checks_run_concurrently_without_changing_source_priority(self):
+    def test_checks_run_concurrently_and_prefer_lower_latency_source(self):
         ready = threading.Barrier(2)
 
         class ParallelSource:
@@ -540,7 +552,7 @@ class TestUpdateManagerSources(unittest.TestCase):
         manager.sources = [ParallelSource("first"), ParallelSource("second")]
         with patch.object(manager, "_find_cached_file", return_value=None):
             info = manager.check_all()
-        self.assertEqual([item["source_name"] for item in info.sources], ["first", "second"])
+        self.assertEqual([item["source_name"] for item in info.sources], ["second", "first"])
 
     def test_overall_deadline_keeps_completed_results_and_discards_late_results(self):
         release = threading.Event()
@@ -636,6 +648,32 @@ class TestUpdateManagerSources(unittest.TestCase):
         self.assertEqual(manager.download_mgr.tasks[1]["expected_hash"], "abc")
         self.assertEqual(manager.download_mgr.tasks[1]["hash_algorithm"], "sha256")
         self.assertFalse(manager.download_mgr.tasks[1]["metadata"]["has_fallback_source"])
+
+    def test_download_can_select_a_specific_checked_source(self):
+        manager = self._manager_with_sources([])
+        primary = UpdateInfo(True, "0.22.7", "更新", "https://example.invalid/primary.zip", "Primary")
+        backup = UpdateInfo(True, "0.22.7", "更新", "https://example.invalid/backup.zip", "Backup")
+        primary.sources = [primary.to_source_dict(), backup.to_source_dict()]
+        manager.current_update_info = primary
+
+        manager.perform_update_download("0.22.7", "https://example.invalid/backup.zip")
+
+        self.assertEqual(manager.download_mgr.tasks[0]["url"], backup.download_url)
+        self.assertEqual(manager.current_update_info.source_name, "Backup")
+
+    def test_download_rejects_an_unknown_source(self):
+        manager = self._manager_with_sources([])
+        manager.current_update_info = UpdateInfo(
+            True,
+            "0.22.7",
+            "更新",
+            "https://example.invalid/primary.zip",
+            "Primary",
+            sources=[UpdateInfo(True, "0.22.7", "更新", "https://example.invalid/primary.zip", "Primary").to_source_dict()],
+        )
+
+        with self.assertRaisesRegex(ValueError, "更新来源"):
+            manager.perform_update_download("0.22.7", "https://example.invalid/missing.zip")
 
     def test_check_all_raises_when_all_remote_sources_fail(self):
         manager = self._manager_with_sources([])

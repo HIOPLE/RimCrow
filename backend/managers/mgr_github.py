@@ -24,7 +24,7 @@ import requests
 from backend.database.models import GithubModRecord, GithubTimeline, SystemInfo, db
 from backend.i18n.messages import localized_key, localized_params, tr
 from backend.managers.mgr_download import DownloadManager, DownloadTask
-from backend.managers.mgr_network import build_retry_session, merge_headers
+from backend.managers.mgr_network import build_retry_session, merge_headers, remaining_request_timeout
 from backend.settings import GITHUB_MIRROR_CATALOG_CACHE_PATH, GIT_PROVIDER_CATALOG_DIR, HOME_DIR, settings
 from backend.utils.event_bus import EventBus
 from backend.utils.bundle_io import replace_dir_atomically
@@ -942,14 +942,50 @@ class GithubManager:
             self._store_cached_payload(cache_key, payload)
             return payload
 
-    def fetch_file_metadata(self, owner: str, repo: str, *, ref: str, remote_path: str, timeout: tuple[int, int] = (8, 25), missing_ok: bool = False) -> dict[str, Any] | None:
-        """读取 GitHub 单文件元数据，并尽量补齐最近更新时间。"""
+    def _fetch_external_metadata(self, url: str, *, params: dict[str, Any] | None = None,
+                                 deadline: float | None = None, cancel_event: threading.Event | None = None,
+                                 network_override: dict[str, Any] | None = None, candidates: list[str] | None = None,
+                                 validate_payload: Callable[[Any], bool] | None = None) -> Any:
+        """外部数据专用 API 候补；不查询附属时间、不转发账号认证、不叠加底层重试。"""
+        if candidates is None:
+            mirrors = (network_override or {}).get("api_mirrors")
+            if mirrors is not None and urlparse(url).hostname == "api.github.com":
+                candidates = [self._render_mirror_url(node["url_template"], url, node.get("url_mode", "full_url")) for node in mirrors]
+                candidates.append(url)
+            else:
+                candidates = self._github_download_candidates(url, "api")
+        last_error = None
+        with build_retry_session(total=0, connect=0, read=0, network_override=network_override) as session:
+            for candidate in dict.fromkeys(candidates):
+                timeout = remaining_request_timeout(deadline, cancel_event)
+                try:
+                    response = session.get(candidate, params=params, headers=self._build_github_headers({"Accept": GITHUB_ACCEPT_HEADER}), timeout=timeout)
+                    try:
+                        response.raise_for_status()
+                        payload = response.json()
+                        if validate_payload is not None and not validate_payload(payload):
+                            raise ValueError("远端元数据结构无效")
+                    finally:
+                        response.close()
+                    remaining_request_timeout(deadline, cancel_event)
+                    return payload
+                except (requests.RequestException, ValueError) as error:
+                    last_error = error
+        if last_error is not None:
+            raise last_error
+        raise ValueError("外部数据元数据没有可用来源")
+
+    def fetch_file_metadata(self, owner: str, repo: str, *, ref: str, remote_path: str, timeout: tuple[int, int] = (8, 25), missing_ok: bool = False,
+                            deadline: float | None = None, cancel_event: threading.Event | None = None,
+                            network_override: dict[str, Any] | None = None, api_candidates: list[str] | None = None) -> dict[str, Any] | None:
+        """读取用于内容比较的必要元数据，提交日期不再阻塞文件 SHA/大小。"""
         normalized_ref = str(ref or "").strip()
         normalized_path = str(remote_path or "").strip().lstrip("/")
         if not normalized_path: return None
 
         cache_key = ("file_meta", owner.lower(), repo.lower(), normalized_ref or "latest", normalized_path)
         cached = self._get_cached_payload(cache_key)
+        remaining_request_timeout(deadline, cancel_event)
         if cached is not self._cache_miss:
             if not isinstance(cached, dict):
                 return cached
@@ -961,28 +997,17 @@ class GithubManager:
             result["fallback_urls"] = candidates[1:]
             return result
 
-        with build_retry_session() as session:
-            response = session.get(
-                f"{GITHUB_API_BASE}/{owner}/{repo}/contents/{quote(normalized_path)}",
-                params={"ref": normalized_ref},
-                headers=self._build_github_headers({"Accept": GITHUB_ACCEPT_HEADER}),
-                timeout=timeout,
-            )
-            if missing_ok and response.status_code == 404:
-                self._store_cached_payload(cache_key, None, ttl_seconds=60)
+        deadline = deadline if deadline is not None else time.monotonic() + sum(timeout)
+        try:
+            payload = self._fetch_external_metadata(
+                f"{GITHUB_API_BASE}/{owner}/{repo}/contents/{quote(normalized_path)}", params={"ref": normalized_ref},
+                deadline=deadline, cancel_event=cancel_event, network_override=network_override, candidates=api_candidates,
+                validate_payload=lambda data: isinstance(data, dict) and isinstance(data.get("sha"), str) and bool(data["sha"])
+                and isinstance(data.get("size"), int) and not isinstance(data["size"], bool) and data["size"] >= 0)
+        except requests.HTTPError as error:
+            if missing_ok and error.response is not None and error.response.status_code == 404:
                 return None
-            self._raise_for_github_status(response, f"{owner}/{repo}/contents/{normalized_path}")
-            payload = response.json()
-
-        latest_commit = self.fetch_path_commit(
-            owner,
-            repo,
-            ref=normalized_ref,
-            remote_path=normalized_path,
-            timeout=timeout,
-            missing_ok=True,
-        )
-        updated_at = self._parse_iso_datetime_to_ms(self._extract_commit_timestamp(latest_commit))
+            raise
         result = {
             "signature": str(payload.get("sha") or ""),
             "size": int(payload.get("size") or 0),
@@ -990,7 +1015,7 @@ class GithubManager:
             "raw_download_url": "",
             # 外部库没有稳定语义版本，这里把短 SHA 作为远端版本提示。
             "version": str(payload.get("sha") or "")[:12],
-            "updated_at": updated_at,
+            "updated_at": 0,
         }
         raw_url = str(payload.get("download_url") or f"https://raw.githubusercontent.com/{owner}/{repo}/{normalized_ref}/{normalized_path}")
         result["raw_download_url"] = raw_url
@@ -1546,6 +1571,40 @@ class GithubManager:
             "needs_update": any(bool(item.get("needs_update")) for item in items),
             "remote_available": len(available_items) == len(items) if items else False,
         }
+
+    def check_external_provider_catalog(self, catalog_url: str = "", **request_options: Any) -> dict[str, Any]:
+        """普通维护检查只取单文件清单；仓库枚举留给显式刷新，不能伪报已是最新。"""
+        items = []
+        for source in self._provider_catalog_sources(catalog_url):
+            cached = self._load_provider_catalog_source_cache(source)
+            item = {"source_id": source["id"], "label": source.get("label"), "exists": bool(cached),
+                    "local_signature": self._provider_catalog_source_signature(cached),
+                    "local_count": len(cached.get("items", [])) if cached else 0,
+                    "remote_available": False, "needs_update": False}
+            try:
+                remaining_request_timeout(request_options.get("deadline"), request_options.get("cancel_event"))
+                if source.get("type") != "provider_json":
+                    item["message"] = "此来源需要枚举仓库，请使用刷新 Git 推荐清单。"
+                else:
+                    payload = self._fetch_external_metadata(source["url"], **request_options)
+                    catalog = self._normalize_provider_catalog_payload(payload, source_url=source["url"])
+                    for record in catalog["items"]:
+                        record["source_id"] = source["id"]
+                        if record.get("type") == "zip":
+                            record["catalog_signature"] = self._catalog_item_signature(record)
+                    signature = self._provider_catalog_source_signature(catalog)
+                    item.update(remote_available=True, remote_signature=signature, remote_count=len(catalog["items"]),
+                                needs_update=not cached or signature != item["local_signature"])
+            except (requests.RequestException, ValueError, TimeoutError, InterruptedError) as error:
+                item["message"] = str(error)
+            items.append(item)
+        available = [item for item in items if item["remote_available"]]
+        return {"sources": items, "remote_available": bool(items) and len(available) == len(items),
+                "needs_update": any(item["needs_update"] for item in items),
+                "local_signature": self._provider_catalog_sources_signature(items, "local_signature"),
+                "remote_signature": self._provider_catalog_sources_signature(available, "remote_signature"),
+                "local_count": sum(item["local_count"] for item in items),
+                "remote_count": sum(item.get("remote_count", 0) for item in available)}
 
     def record_timeline(self, repo_url: str, action: str, message: str):
         """主动记录操作轨迹"""
