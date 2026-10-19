@@ -2408,6 +2408,7 @@
         "active": "Derzeit aktiv",
         "all": "Alle Staaten",
         "coexist_disabled": "Koexistenz behindert",
+        "duplicates": "Mit Duplikaten",
         "inactive": "Inaktiv",
         "mod_disabled": "Mod inaktiv"
       },
@@ -5787,6 +5788,7 @@
         "last_active_time": "Aktivierungszeit",
         "last_moved_time": "Verschobene Zeit",
         "multiplayer_compat": "Multiplayer-Kompatibilität",
+        "original_name": "Originalname",
         "patch_file_count": "Patch-Anzahl",
         "texture_file_count": "Texturanzahl",
         "xml_file_count": "XML-Anzahl"

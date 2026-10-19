@@ -2408,6 +2408,7 @@
         "active": "В настоящее время активен",
         "all": "Все штаты",
         "coexist_disabled": "Сосуществовать отключено",
+        "duplicates": "Есть дубликаты",
         "inactive": "Неактивный",
         "mod_disabled": "Мод неактивен"
       },
@@ -5787,6 +5788,7 @@
         "last_active_time": "Время активации",
         "last_moved_time": "Перемещенное время",
         "multiplayer_compat": "Многопользовательская совместимость",
+        "original_name": "Исходное название",
         "patch_file_count": "Количество патчей",
         "texture_file_count": "Количество текстур",
         "xml_file_count": "Количество XML"

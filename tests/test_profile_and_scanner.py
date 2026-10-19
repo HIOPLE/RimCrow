@@ -1805,6 +1805,52 @@ class TestModAnalyzer(unittest.TestCase):
 
 
 class TestModScanner(unittest.TestCase):
+    def test_resolve_preview_supports_common_formats_and_mixed_case_names(self):
+        scanner = ModScanner.__new__(ModScanner)
+        for filename in ("Preview.png", "preview.jpg", "Preview.jpeg", "PREVIEW.WEBP", "pReViEw.GiF", "Preview.bmp"):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as temp_dir:
+                about_dir = Path(temp_dir) / "About"
+                about_dir.mkdir()
+                preview = about_dir / filename
+                preview.touch()
+
+                preview_path, icon_path = scanner._resolve_images(temp_dir, "")
+
+                self.assertEqual(preview_path, normalize_path_for_storage(preview))
+                self.assertEqual(icon_path, "")
+
+    def test_resolve_preview_keeps_format_priority_and_icon_rules(self):
+        scanner = ModScanner.__new__(ModScanner)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            about_dir = Path(temp_dir) / "About"
+            about_dir.mkdir()
+            for filename in ("Preview.gif", "Preview.webp", "Preview.jpeg", "Preview.jpg", "Preview.png", "ModIcon.png"):
+                (about_dir / filename).touch()
+            texture_dir = Path(temp_dir) / "Textures"
+            texture_dir.mkdir()
+            (texture_dir / "CustomIcon.png").touch()
+
+            preview_path, icon_path = scanner._resolve_images(temp_dir, "CustomIcon")
+            self.assertEqual(preview_path, normalize_path_for_storage(about_dir / "Preview.png"))
+            self.assertEqual(icon_path, normalize_path_for_storage(about_dir / "ModIcon.png"))
+
+            (about_dir / "Preview.png").unlink()
+            (about_dir / "ModIcon.png").unlink()
+            preview_path, icon_path = scanner._resolve_images(temp_dir, "CustomIcon")
+            self.assertEqual(preview_path, normalize_path_for_storage(about_dir / "Preview.jpg"))
+            self.assertEqual(icon_path, normalize_path_for_storage(texture_dir / "CustomIcon.png"))
+
+    def test_resolve_preview_ignores_directories_and_unrelated_files(self):
+        scanner = ModScanner.__new__(ModScanner)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.assertEqual(scanner._resolve_images(temp_dir, ""), ("", ""))
+            about_dir = Path(temp_dir) / "About"
+            about_dir.mkdir()
+            (about_dir / "Preview.png").mkdir()
+            (about_dir / "Other.jpg").touch()
+            (about_dir / "Preview.svg").touch()
+            self.assertEqual(scanner._resolve_images(temp_dir, ""), ("", ""))
+
     def test_dlc_without_package_id_uses_fallback_id(self):
         temp_root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, temp_root, ignore_errors=True)

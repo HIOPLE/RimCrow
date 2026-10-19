@@ -40,7 +40,7 @@ app.mount('#app')
 window.ready = true
 `
 const server = await createServer({
-  root: process.cwd(), server: { host: '127.0.0.1', port: 5187, strictPort: false },
+  root: process.cwd(), cacheDir: 'node_modules/.vite-tests/software-update', server: { host: '127.0.0.1', port: 5187, strictPort: false },
   plugins: [{ name: 'software-update-browser-check',
     resolveId: id => id === '/__update.js' ? '\0software-update-check' : undefined,
     load: id => id === '\0software-update-check' ? entry : undefined,

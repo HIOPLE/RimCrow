@@ -2408,6 +2408,7 @@
         "active": "현재 활동 중",
         "all": "모든 주",
         "coexist_disabled": "공존 비활성화됨",
+        "duplicates": "중복 있음",
         "inactive": "비활성",
         "mod_disabled": "모드 비활성"
       },
@@ -5787,6 +5788,7 @@
         "last_active_time": "활성화 시간",
         "last_moved_time": "이동된 시간",
         "multiplayer_compat": "멀티플레이어 호환성",
+        "original_name": "원래 이름",
         "patch_file_count": "패치 수",
         "texture_file_count": "텍스처 수",
         "xml_file_count": "XML 수"

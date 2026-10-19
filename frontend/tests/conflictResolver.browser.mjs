@@ -57,7 +57,7 @@ window.showDisabled = async () => {
 app.mount('#app'); window.ready = true
 `
 const server = await createServer({
-  root: fileURLToPath(new URL('..', import.meta.url)), server: { port: 0, strictPort: false },
+  root: fileURLToPath(new URL('..', import.meta.url)), cacheDir: 'node_modules/.vite-tests/conflict-resolver', server: { port: 0, strictPort: false },
   plugins: [{
     name: 'conflict-check',
     resolveId(id) { if (id === '/__conflict.js') return id },

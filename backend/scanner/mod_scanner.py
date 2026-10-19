@@ -768,13 +768,21 @@ class ModScanner:
         """
         解析预览图和图标的绝对路径。
         """
-        # --- Preview.png ---
-        # 默认位置：About/Preview.png
-        # 扩展：RimWorld 也支持 jpg/gif 改名为 png，或者直接识别。
-        # 这里简单起见，先只找 About/Preview.png，如果要做得细致，可以 glob 搜索
-        preview_path = os.path.join(mod_path, 'About', 'Preview.png')
-        if os.path.isfile(preview_path): preview_path = normalize_path_for_storage(preview_path)
-        else: preview_path = ""
+        # 只枚举一次 About 目录，忽略文件名大小写；多种格式并存时优先使用 PNG。
+        preview_files = {}
+        about_path = os.path.join(mod_path, 'About')
+        try:
+            with os.scandir(about_path) as entries:
+                preview_files = {entry.name.lower(): entry.path for entry in entries
+                                 if entry.name.lower().startswith('preview.') and entry.is_file()}
+        except OSError as error:
+            logger.debug(f"读取模组预览图目录失败，跳过预览图：{about_path}，原因：{error}")
+        preview_path = ""
+        for extension in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'):
+            candidate = preview_files.get(f'preview{extension}')
+            if candidate:
+                preview_path = normalize_path_for_storage(candidate)
+                break
 
         # --- ModIcon.png ---
         icon_path = os.path.join(mod_path, 'About', 'ModIcon.png')

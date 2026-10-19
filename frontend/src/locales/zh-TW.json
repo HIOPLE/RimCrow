@@ -2408,6 +2408,7 @@
         "active": "目前激活",
         "all": "全部狀態",
         "coexist_disabled": "共存停用",
+        "duplicates": "存在重複",
         "inactive": "未啟用",
         "mod_disabled": "模組停用"
       },
@@ -5787,6 +5788,7 @@
         "last_active_time": "啟用時間",
         "last_moved_time": "移動時間",
         "multiplayer_compat": "聯機兼容性",
+        "original_name": "原名",
         "patch_file_count": "補丁數量",
         "texture_file_count": "貼圖數量",
         "xml_file_count": "XML 數量"

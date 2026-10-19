@@ -80,6 +80,19 @@ class TestFileManager(unittest.TestCase):
         self.assertEqual(selected, "picked.rimcrowdata.zip")
         tk_dialog.assert_not_called()
 
+    def test_thumbnail_generation_supports_common_preview_formats(self):
+        for extension in ("png", "jpg", "jpeg", "webp", "gif", "bmp"):
+            with self.subTest(extension=extension), tempfile.TemporaryDirectory() as temp_dir:
+                preview_path = Path(temp_dir) / f"Preview.{extension}"
+                with Image.new("RGB", (128, 96), "red") as image:
+                    image.save(preview_path)
+                with patch("backend.managers.mgr_files.THUMBNAIL_CACHE_DIR", temp_dir):
+                    target_path = LocalAssetHandler._ensure_thumbnail("test.mod", str(preview_path))
+                self.assertTrue(target_path)
+                with Image.open(target_path) as thumbnail:
+                    self.assertEqual(thumbnail.format, "WEBP")
+                    self.assertEqual(thumbnail.size, (64, 48))
+
     def test_thumbnail_generation_tolerates_broken_png_metadata(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
