@@ -1,6 +1,6 @@
 import ast
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
@@ -21,7 +21,7 @@ class LanzouParser:
     MAX_PAGES = 100
     PAGE_SIZE = 50
 
-    def __init__(self, session: Any = None):
+    def __init__(self, session: Any = None, *, check_cancelled: Callable[[], None] | None = None):
         # 蓝奏云是直连来源，不继承应用或环境代理。
         self.session = session if session is not None else build_retry_session(route_manager=False, trust_env=False)
         self.session.headers.update({
@@ -29,10 +29,13 @@ class LanzouParser:
             'Accept-Language': 'zh-CN,zh;q=0.9',
         })
         self.last_error = ""
+        self._check_cancelled = check_cancelled
 
     def _get_with_acw_retry(self, url: str, **kwargs: Any) -> Any:
         kwargs.setdefault("timeout", (5, 30))
         for attempt in range(2):
+            if self._check_cancelled:
+                self._check_cancelled()
             res = self.session.get(url, **kwargs)
             if res.status_code >= 400:
                 res.raise_for_status()
@@ -186,6 +189,8 @@ class LanzouParser:
         headers = {"Referer": page_url, "Origin": f"{parsed.scheme}://{parsed.netloc}", "X-Requested-With": "XMLHttpRequest"}
         errors = []
         for endpoint, payload in candidates:
+            if self._check_cancelled:
+                self._check_cancelled()
             try:
                 payload = {key: str(value).lower() if isinstance(value, bool) else value for key, value in payload.items()}
                 res = self.session.post(endpoint, data=payload, headers=headers, timeout=(5, 30))

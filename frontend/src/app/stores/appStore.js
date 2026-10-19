@@ -101,6 +101,8 @@ export const useAppStore = defineStore('app', () => {
     hasUpdate: false,
     info: null,    // 存储后端返回的 UpdateInfo
     isChecking: false,
+    lastCheckedAt: 0,
+    checkError: '',
   })
   const remoteImageCache = reactive({
     file_count: 0,
@@ -543,7 +545,7 @@ export const useAppStore = defineStore('app', () => {
 
   const {
     // 更新检查与安装提示
-    checkUpdate, showChangelog, _showInstallPrompt,
+    checkUpdate, showChangelog, showAvailableUpdate, _showInstallPrompt,
   } = useUpdateActions({
     updateState,
     upgradeContext,
@@ -1297,7 +1299,10 @@ export const useAppStore = defineStore('app', () => {
         showUserErrorToast(task, t('messages.app.steam_unsubscribe.failed', '取消订阅失败。请确认 Steam 已登录、网络可用，稍后重试。'))
       }
       if (task.type === 'update' && task.status === 'success' && task.metrics?.ready_to_install) {
-        if (updateState.info) updateState.info.local_status = 'ready'
+        if (updateState.info) {
+          updateState.info.local_status = 'ready'
+          updateState.info.local_file_path = task.metrics.path
+        }
         if (!updateInstallPrompted.has(task.id)) {
           updateInstallPrompted.add(task.id)
           _showInstallPrompt(task.metrics)
@@ -1305,6 +1310,7 @@ export const useAppStore = defineStore('app', () => {
       }
       if (task.type === 'update' && task.status === 'failed') {
         if (task.metrics?.has_fallback_source) return
+        if (updateState.info?.local_status === 'downloading') updateState.info.local_status = 'remote'
         showUserErrorToast(task, t('messages.app.update.download_failed', '下载更新包失败。请检查网络连接、代理设置和磁盘空间，稍后重试。'))
       }
       if (task.type === 'ai-task' && task.status === 'failed') {
@@ -1951,7 +1957,7 @@ export const useAppStore = defineStore('app', () => {
     downloadWorkshopItemsViaSteam, repairWorkshopItemsViaSteamCMD, querySteamWorkshopDetails,
     // 设置、任务与应用维护
     saveSetting, applySettings, revealSecret, clearSecret, refreshUserThemes, saveUserTheme, deleteUserTheme, openSettingsPanel, closeSettingsPanel, resetDatabase, repairDatabase, restartApplication, showChangelog, setSidebarTab, cancelTextureTask, cancelTaskByProgress, supportsTaskCancellation, canCancelTask, isTaskCancelPending,
-    checkSteamTools, checkToolMaintenance, checkExternalDataUpdates, checkManagedModUpdates, checkSteamcmdModUpdates, runScheduledMaintenanceChecks, checkUpdate, updateExternalDB,
+    checkSteamTools, checkToolMaintenance, checkExternalDataUpdates, checkManagedModUpdates, checkSteamcmdModUpdates, runScheduledMaintenanceChecks, checkUpdate, showAvailableUpdate, updateExternalDB,
     // 包传输
     openPackageTransferDialog, openCustomModExportDialog, updatePackageTransferDialogPreset, closePackageTransferDialog,
     getDataBundleSchema, inspectDataBundle, exportDataBundle, importDataBundle,

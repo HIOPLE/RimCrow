@@ -1017,7 +1017,8 @@
     "update": {
       "download_started": "開始下載更新包",
       "installing_restart": "正在重啟並安裝更新。",
-      "no_available_info": "目前沒有可用的更新資訊，請先檢查更新"
+      "no_available_info": "目前沒有可用的更新資訊，請先檢查更新",
+      "result_changed": "更新資訊已變更，請重新查看更新。"
     },
     "uri": {
       "no_link_to_open": "沒有可打開的連結。",
@@ -4922,8 +4923,7 @@
       "download_started": "已開始下載更新包，請留意底部狀態欄。",
       "install_cancelled": "已取消安裝更新。",
       "partial_no_update": "部分更新源暫時不可用，目前可用來源未發現新版本。",
-      "recommend_scan": "建議執行一次全量掃描，以應用新版本的核心引擎特性！",
-      "up_to_date": "目前已是最新版本"
+      "recommend_scan": "建議執行一次全量掃描，以應用新版本的核心引擎特性！"
     },
     "workspace": {
       "cleanup_deleted_done": "已清理 {count} 條已刪除記錄",
@@ -6928,17 +6928,34 @@
       }
     },
     "update": {
+      "auto_source_message": "下載失敗時會自動嘗試備用位址。若仍無法下載，可前往「設定 → 關於專案」的下載位址，手動取得適用於目前系統的安裝套件，退出軟體後解壓縮並覆蓋安裝目錄。",
       "available_desc": "發現可用更新。",
+      "check_failed": "無法檢查更新，請稍後重試。",
+      "checking_sources": "正在檢查更新來源…",
+      "download_update": "下載更新",
       "downloaded": "已下載",
+      "downloading": "正在下載更新，進度可在工作列查看",
       "file_size_meta": "檔案大小: {size}",
       "ignore_version": "忽略此版本",
       "install_now": "立即安裝",
+      "last_checked": "最近檢查：{time}",
       "later": "以後再說",
-      "multiple_sources_message": "檢測到多個同版本來源: {sources}。將優先使用第一個來源，失敗後自動嘗試候補來源。",
       "new_version_title": "發現新版本 v{version}",
-      "single_source_message": "來源: {source}。檔案大小: {size}。",
-      "source_meta": "來源: {source}",
-      "update_now": "立即更新"
+      "no_compatible_update": "未發現適用於目前系統的新版本",
+      "not_checked": "尚未檢查更新",
+      "partial_available": "部分來源暫時無法檢查，不影響使用已發現的更新。",
+      "ready": "安裝套件已就緒，可稍後安裝",
+      "result_changed": "更新資訊已變更，請重新查看更新。",
+      "source_available": "已發現此版本",
+      "source_details": "來源詳細資訊",
+      "source_failed": "暫時無法檢查",
+      "source_no_package": "沒有適用的安裝套件",
+      "source_no_release": "尚未發佈版本",
+      "source_no_update": "未發現新版本",
+      "source_older": "尚未同步目標版本（v{version}）",
+      "version_available": "發現新版本 v{version}",
+      "via_builtin_mirror": " · 透過內建鏡像讀取",
+      "view_update": "查看更新"
     },
     "update_modal": {
       "empty": "沒有找到更新記錄...",

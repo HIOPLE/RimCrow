@@ -98,7 +98,7 @@ class TestGithubMirrorPool(unittest.TestCase):
         settings.config.github_dynamic_mirrors_enabled = True
         self.assertEqual([n["origin"] for n in GithubManager.get_effective_mirrors("custom:custom", "web")], ["custom"])
         self.assertEqual([n["origin"] for n in GithubManager.get_effective_mirrors("dynamic:dynamic", "web")], ["dynamic"])
-        self.assertEqual([n["origin"] for n in GithubManager.get_effective_mirrors("auto", "web")], ["dynamic", "custom", "builtin"])
+        self.assertEqual([n["origin"] for n in GithubManager.get_effective_mirrors("auto", "web")], ["dynamic", "custom"])
 
     def test_auto_uses_cached_health_and_never_refreshes(self):
         with patch.object(GithubManager, "start_mirror_catalog_refresh") as refresh:
@@ -114,6 +114,36 @@ class TestGithubMirrorPool(unittest.TestCase):
 
 
 class TestGithubMirrorProbe(unittest.TestCase):
+    def test_builtin_defines_all_capabilities_and_only_gh_proxy(self):
+        from backend.settings import GITHUB_MIRROR_CAPABILITIES
+        nodes = GithubManager._builtin_mirrors()
+        self.assertEqual([node["url_template"] for node in nodes], ["https://gh-proxy.org/{url}"])
+        self.assertEqual(set(nodes[0]["support"]), set(GITHUB_MIRROR_CAPABILITIES))
+        self.assertEqual(nodes[0]["support"]["api"]["status"], "supported")
+        self.assertEqual(nodes[0]["support"]["web"]["status"], "unsupported")
+
+    def test_probe_accepts_gist_raw_and_rejects_html_substitute(self):
+        for body, content_type, expected in ((b"# Compiled source", "text/plain", "supported"), (b"<html>proxy home</html>", "text/html", "unsupported")):
+            with self.subTest(expected=expected):
+                response = MagicMock(status_code=200, url="https://mirror.example/gist")
+                response.headers = {"Content-Type": content_type}
+                response.iter_content.return_value = iter([body[:5], body[5:]])
+                response.__enter__.return_value = response
+                with patch("backend.managers.mgr_github.build_retry_session") as build:
+                    build.return_value.__enter__.return_value.get.return_value = response
+                    _, result = GithubManager._probe_mirror_url("https://mirror.example/{url}", "https://gist.githubusercontent.com/octocat/9257657/raw")
+                self.assertEqual(result["status"], expected)
+
+    def test_gist_pages_do_not_inherit_raw_content_support(self):
+        for url in ("https://gist.github.com/octocat/9257657", "https://gist.github.com/octocat/raw"):
+            self.assertEqual(GithubManager.github_url_capability(url), "web")
+            with patch.object(settings.config, "github_mirror_id", "builtin:gh_proxy"):
+                self.assertEqual(GithubManager._github_download_candidates(url), [url])
+        for url in ("https://gist.github.com/octocat/9257657/raw", "https://gist.github.com/octocat/9257657/raw/file.txt", "https://gist.githubusercontent.com/octocat/9257657/raw"):
+            self.assertEqual(GithubManager.github_url_capability(url), "gist")
+            with patch.object(settings.config, "github_mirror_id", "builtin:gh_proxy"):
+                self.assertEqual(GithubManager._github_download_candidates(url), [f"https://gh-proxy.org/{url}", url])
+
     def setUp(self):
         self.manager = GithubManager()
 

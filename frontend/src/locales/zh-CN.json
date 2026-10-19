@@ -1017,7 +1017,8 @@
     "update": {
       "download_started": "开始下载更新包",
       "installing_restart": "正在重启并安装更新。",
-      "no_available_info": "当前没有可用的更新信息，请先检查更新"
+      "no_available_info": "当前没有可用的更新信息，请先检查更新",
+      "result_changed": "更新信息已变化，请重新查看更新。"
     },
     "uri": {
       "no_link_to_open": "没有可打开的链接。",
@@ -4922,8 +4923,7 @@
       "download_started": "已开始下载更新包，请留意底部状态栏。",
       "install_cancelled": "已取消安装更新。",
       "partial_no_update": "部分更新源暂时不可用，当前可用来源未发现新版本。",
-      "recommend_scan": "建议执行一次全量扫描，以应用新版本的核心引擎特性！",
-      "up_to_date": "当前已是最新版本"
+      "recommend_scan": "建议执行一次全量扫描，以应用新版本的核心引擎特性！"
     },
     "workspace": {
       "cleanup_deleted_done": "已清理 {count} 条已删除记录",
@@ -6928,17 +6928,34 @@
       }
     },
     "update": {
+      "auto_source_message": "下载失败时会自动尝试备用地址。若仍无法下载，可前往“设置 → 关于项目”的下载地址手动获取适用于当前系统的安装包，退出软件后解压并覆盖安装目录。",
       "available_desc": "发现可用更新。",
+      "check_failed": "无法检查更新，请稍后重试。",
+      "checking_sources": "正在检查更新来源…",
+      "download_update": "下载更新",
       "downloaded": "已下载",
+      "downloading": "正在下载更新，进度可在任务栏查看",
       "file_size_meta": "文件大小: {size}",
       "ignore_version": "忽略此版本",
       "install_now": "立即安装",
+      "last_checked": "最近检查：{time}",
       "later": "以后再说",
-      "multiple_sources_message": "检测到多个同版本来源: {sources}。将优先使用第一个来源，失败后自动尝试候补来源。",
       "new_version_title": "发现新版本 v{version}",
-      "single_source_message": "来源: {source}。文件大小: {size}。",
-      "source_meta": "来源: {source}",
-      "update_now": "立即更新"
+      "no_compatible_update": "未发现适用于当前系统的新版本",
+      "not_checked": "尚未检查更新",
+      "partial_available": "部分来源暂时无法检查，不影响使用已发现的更新。",
+      "ready": "安装包已就绪，可稍后安装",
+      "result_changed": "更新信息已变化，请重新查看更新。",
+      "source_available": "已发现此版本",
+      "source_details": "来源详情",
+      "source_failed": "暂时无法检查",
+      "source_no_package": "没有适用的安装包",
+      "source_no_release": "尚未发布版本",
+      "source_no_update": "未发现新版本",
+      "source_older": "尚未同步目标版本（v{version}）",
+      "version_available": "发现新版本 v{version}",
+      "via_builtin_mirror": " · 通过内置镜像读取",
+      "view_update": "查看更新"
     },
     "update_modal": {
       "empty": "没有找到更新记录...",

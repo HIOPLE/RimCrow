@@ -1017,7 +1017,8 @@
     "update": {
       "download_started": "Mit dem Herunterladen des Update-Pakets begonnen",
       "installing_restart": "Neustart und Installation des Updates.",
-      "no_available_info": "Es sind keine Update-Informationen verfügbar. Suchen Sie zuerst nach Updates."
+      "no_available_info": "Es sind keine Update-Informationen verfügbar. Suchen Sie zuerst nach Updates.",
+      "result_changed": "Die Update-Informationen haben sich geändert. Bitte öffnen Sie das Update erneut."
     },
     "uri": {
       "no_link_to_open": "Kein Link zum Öffnen.",
@@ -4922,8 +4923,7 @@
       "download_started": "Update-Download gestartet. Beobachten Sie den Fortschritt in der Statusleiste.",
       "install_cancelled": "Update-Installation abgebrochen.",
       "partial_no_update": "Einige Update-Quellen sind nicht verfügbar. Aus den verfügbaren Quellen wurde keine neue Version gefunden.",
-      "recommend_scan": "Führen Sie einen vollständigen Scan durch, um die Kernfunktionen der neuen Version zu übernehmen.",
-      "up_to_date": "Sie sind bereits auf der neuesten Version."
+      "recommend_scan": "Führen Sie einen vollständigen Scan durch, um die Kernfunktionen der neuen Version zu übernehmen."
     },
     "workspace": {
       "cleanup_deleted_done": "Bereinigte gelöschte {count}-Datensätze",
@@ -6928,17 +6928,34 @@
       }
     },
     "update": {
+      "auto_source_message": "Bei einem fehlgeschlagenen Download werden automatisch Ersatzadressen versucht. Falls auch diese nicht funktionieren, laden Sie über einen Link unter Einstellungen → Über das Projekt das Paket für Ihr System herunter. Beenden Sie die Anwendung und entpacken Sie das Paket in den Installationsordner, wobei vorhandene Dateien ersetzt werden.",
       "available_desc": "Ein Update ist verfügbar.",
+      "check_failed": "Updates können nicht geprüft werden. Bitte versuchen Sie es später erneut.",
+      "checking_sources": "Update-Quellen werden geprüft…",
+      "download_update": "Update herunterladen",
       "downloaded": "Heruntergeladen",
+      "downloading": "Update wird heruntergeladen; Fortschritt in der Aufgabenleiste",
       "file_size_meta": "Dateigröße: {size}",
       "ignore_version": "Ignorieren Sie diese Version",
       "install_now": "Jetzt installieren",
+      "last_checked": "Zuletzt geprüft: {time}",
       "later": "Später",
-      "multiple_sources_message": "Für dieselbe Version wurden mehrere Quellen gefunden: {sources}. Die erste Quelle wird zuerst verwendet und bei einem Fehler werden automatisch Ersatzquellen ausprobiert.",
       "new_version_title": "Neue Version v{version} verfügbar",
-      "single_source_message": "Quelle: {source}. Dateigröße: {size}.",
-      "source_meta": "Quelle: {source}",
-      "update_now": "Jetzt aktualisieren"
+      "no_compatible_update": "Keine neue Version für dieses System gefunden",
+      "not_checked": "Noch nicht auf Updates geprüft",
+      "partial_available": "Einige Quellen konnten nicht geprüft werden. Das über andere Quellen gefundene Update ist weiterhin verfügbar.",
+      "ready": "Das Update-Paket ist bereit und kann später installiert werden.",
+      "result_changed": "Die Update-Informationen haben sich geändert. Bitte öffnen Sie das Update erneut.",
+      "source_available": "Diese Version ist verfügbar",
+      "source_details": "Quellendetails",
+      "source_failed": "Prüfung vorübergehend nicht möglich",
+      "source_no_package": "Kein passendes Update-Paket",
+      "source_no_release": "Noch keine Version veröffentlicht",
+      "source_no_update": "Keine neue Version gefunden",
+      "source_older": "Zielversion noch nicht verfügbar (v{version})",
+      "version_available": "Neue Version v{version} verfügbar",
+      "via_builtin_mirror": " · Über den integrierten Spiegel gelesen",
+      "view_update": "Update anzeigen"
     },
     "update_modal": {
       "empty": "Keine Aktualisierungsdatensätze gefunden...",

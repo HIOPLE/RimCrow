@@ -5758,7 +5758,7 @@ class API:
             # (如果本地已经下好了，即使是忽略版本也应该提示安装，避免浪费空间)
             ignored_ver = settings.config.ignored_update_version
             if not manual and info.version == ignored_ver and info.local_status != 'ready':
-                return ApiResponse.success({ "has_update": False })
+                return ApiResponse.success({**info.to_dict(), "is_ignored": True})
             # 3. 返回给前端
             # info.to_dict() 包含了 local_status ('remote'|'downloading'|'ready')
             return ApiResponse.success(info.to_dict())
@@ -5772,22 +5772,28 @@ class API:
             )
 
     @log_api_call
-    def update_trigger_action(self):
+    def update_trigger_action(self, target_version: str = "", install_confirmed: bool = False) -> Dict[str, Any]:
         """
         [统一入口] 触发更新操作
-        根据当前状态，自动决定是 '开始下载' 还是 '直接安装'
+        下载请求不得因包已就绪而直接安装，安装必须携带前端确认结果。
         """
         try:
             # 获取当前缓存的更新信息
             info = self.update_mgr.current_update_info
             if not info or not info.has_update:
                 return ApiResponse.error(tr("api.update.no_available_info", "当前没有可用的更新信息，请先检查更新"))
+            if target_version and target_version != info.version:
+                return ApiResponse.error(tr("api.update.result_changed", "更新信息已变化，请重新查看更新。"))
             # A. 如果本地已就绪 -> 执行安装
             if info.local_status == "ready":
+                if install_confirmed is not True:
+                    return ApiResponse.success({"status": "ready", "path": info.local_file_path, "version": info.version})
                 self.update_mgr.execute_hot_swap() # 这会重启程序
                 return ApiResponse.success(message=tr("api.update.installing_restart", "正在重启并安装更新。"))
             # B. 否则 -> 开始下载
             else:
+                if install_confirmed:
+                    return ApiResponse.error(tr("api.update.result_changed", "更新信息已变化，请重新查看更新。"))
                 result = self.update_mgr.perform_update_download()
                 # result 格式: {"status": "downloading", "task_id": "..."}
                 return ApiResponse.success(result, message=tr("api.update.download_started", "开始下载更新包"))

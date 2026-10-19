@@ -3,7 +3,8 @@
     <!-- 统一过渡容器 -->
     <Transition :name="isMini ? 'mini-zoom' : 'modal-fade'">
       <div v-if="confirmStore.isVisible"
-        class="fixed inset-0 z-9999 font-sans text-text-main selection:bg-bg-overlay/10"
+        class="fixed inset-0 font-sans text-text-main selection:bg-bg-overlay/10"
+        :style="{ zIndex: UI_Z_INDEX.CONFIRM }"
         :class="isMini ? 'pointer-events-none' : 'flex items-center justify-center'"
         @keydown.esc="handleCancel"
         @keydown.enter="handleEnterKey"
@@ -13,7 +14,7 @@
         <div v-if="!isMini" @mousedown="handleBackdropClick" class="absolute inset-0 bg-bg-deep/20 backdrop-blur-xs transition-opacity duration-500"></div>
 
         <!-- 2. 弹窗主体容器 -->
-        <div ref="modalRef"
+        <div ref="modalRef" role="dialog" aria-modal="true" :aria-label="confirmStore.state.title"
           class="relative flex flex-col overflow-hidden transition-all pointer-events-auto box-border"
           :class="[
             // 核心质感：极深色玻璃 + 顶部高光边框 + 强阴影
@@ -146,6 +147,15 @@
                   <div v-else class="whitespace-pre-line break-words">{{ item.description }}</div>
                 </div>
                 <div class="min-w-0">
+                  <details v-if="item.details?.length" class="mt-3 text-xs text-text-dim">
+                    <summary class="cursor-pointer py-2 text-text-soft">{{ item.detailsTitle }}</summary>
+                    <dl class="space-y-2 border-t border-border-base/10 py-2">
+                      <div v-for="(detail, index) in item.details" :key="index" class="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                        <dt>{{ detail.label }}</dt>
+                        <dd class="min-w-0 break-words">{{ detail.value }}</dd>
+                      </div>
+                    </dl>
+                  </details>
                   <div v-if="item.meta?.length" class="mt-1 flex flex-wrap gap-1">
                     <span
                       v-for="meta in item.meta"
@@ -225,6 +235,7 @@
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue'
 import { useConfirmStore } from './confirmStore'
+import { UI_Z_INDEX } from '../../lib/constants.js'
 import { useAppStore } from '../../../app/stores/appStore'
 import { onClickOutside, useWindowSize } from '@vueuse/core'
 import { Info, CircleAlert, CircleX, CircleCheckBig } from 'lucide-vue-next'
@@ -384,7 +395,7 @@ const handleBackdropClick = () => {
   }
 }
 
-// 自动聚焦
+// 弹窗按需挂载时已处于可见状态，首次也必须初始化聚焦和富文本。
 watch(() => confirmStore.isVisible, async (val) => {
   if (val && confirmStore.state.mode === 'prompt') {
     await nextTick()
@@ -395,7 +406,7 @@ watch(() => confirmStore.isVisible, async (val) => {
   } else {
     richDescriptionHtml.value = {}
   }
-})
+}, { immediate: true })
 
 watch(
   () => confirmStore.state.promptItems,
@@ -499,6 +510,14 @@ onClickOutside(modalRef, () => {
 :deep(.prompt-description-rich ol) {
   margin: 0.35rem 0;
   padding-left: 1.1rem;
+}
+
+:deep(.prompt-description-rich ul) {
+  list-style-type: disc;
+}
+
+:deep(.prompt-description-rich ol) {
+  list-style-type: decimal;
 }
 
 :deep(.prompt-description-rich li) {

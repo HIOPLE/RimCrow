@@ -1,15 +1,78 @@
 import tempfile
 import unittest
 import zipfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import requests
+import pytest
 
 from backend.managers.mgr_download import DownloadTask
 from backend.managers.mgr_update import GiteeSource, GithubSource, LanzouSource, LocalSource, ManifestSource, SourceForgeSource, UpdateInfo, UpdateManager, UpdateSourceError, _build_configured_update_sources
 from backend.settings import settings
 from backend.utils.lanzou_parser import LanzouParser
+
+
+@pytest.fixture(autouse=True)
+def isolated_update_manager(monkeypatch):
+    monkeypatch.setattr(UpdateManager, "_instance", None)
+
+
+def test_update_action_rejects_a_stale_version_before_installation():
+    from backend.api import API
+    api = object.__new__(API)
+    api.update_mgr = Mock(current_update_info=UpdateInfo(True, "1.2.4", "", "", "GitHub", local_status="ready"))
+    result = api.update_trigger_action("1.2.3")
+    assert result["status"] == "error"
+    api.update_mgr.execute_hot_swap.assert_not_called()
+    api.update_mgr.perform_update_download.assert_not_called()
+
+
+def test_ready_package_requires_explicit_installation_confirmation():
+    from backend.api import API
+    api = object.__new__(API)
+    api.update_mgr = Mock(current_update_info=UpdateInfo(True, "1.2.3", "", "", "GitHub", local_status="ready", local_file_path="F:/update.zip"))
+    result = api.update_trigger_action("1.2.3")
+    assert result["data"] == {"status": "ready", "path": "F:/update.zip", "version": "1.2.3"}
+    api.update_mgr.execute_hot_swap.assert_not_called()
+    api.update_trigger_action("1.2.3", True)
+    api.update_mgr.execute_hot_swap.assert_called_once()
+    api.update_mgr.perform_update_download.assert_not_called()
+
+
+def test_confirmed_installation_does_not_start_a_new_download():
+    from backend.api import API
+    api = object.__new__(API)
+    api.update_mgr = Mock(current_update_info=UpdateInfo(True, "1.2.3", "", "", "GitHub"))
+    assert api.update_trigger_action("1.2.3", True)["status"] == "error"
+    api.update_mgr.perform_update_download.assert_not_called()
+
+
+def test_ignored_automatic_update_keeps_full_result(monkeypatch):
+    from backend.api import API
+    api = object.__new__(API)
+    info = UpdateInfo(True, "1.2.3", "", "https://example.org/app.zip", "GitHub")
+    api.update_mgr = Mock()
+    api.update_mgr.check_all.return_value = info
+    api._log_maintenance_check = Mock()
+    monkeypatch.setattr(settings.config, "ignored_update_version", "1.2.3")
+    monkeypatch.setattr(settings, "set", Mock())
+    result = api.update_check(False)
+    assert result["data"]["is_ignored"] is True
+    assert result["data"]["has_update"] is True
+    assert result["data"]["version"] == "1.2.3"
+
+
+def test_cancelled_lanzou_check_does_not_start_another_request():
+    session = Mock()
+    def check_cancelled():
+        raise requests.Timeout("cancelled")
+    parser = LanzouParser(session, check_cancelled=check_cancelled)
+    with pytest.raises(requests.Timeout):
+        parser._get_with_acw_retry("https://example.org/folder")
+    session.get.assert_not_called()
 
 
 class StubUpdateSource:
@@ -35,6 +98,47 @@ class StubDownloadManager:
 
 
 class TestGithubUpdateSource(unittest.TestCase):
+    def test_release_api_uses_original_first_without_auth_or_global_mirror(self):
+        source = GithubSource("team/app")
+        payload = {"tag_name": "v1.2.3", "assets": []}
+        response = Mock(status_code=200)
+        response.json.return_value = payload
+        with patch("backend.managers.mgr_update._request_update", return_value=response) as request:
+            self.assertEqual(source._request_release("team", "app"), payload)
+        self.assertEqual(request.call_count, 1)
+        self.assertEqual(request.call_args.args[0], "https://api.github.com/repos/team/app/releases/latest")
+        self.assertNotIn("Authorization", request.call_args.kwargs["headers"])
+        response.close.assert_called_once()
+
+    def test_release_api_falls_back_on_timeout_and_invalid_content(self):
+        for failure in (requests.Timeout("slow"), ValueError("HTML instead of JSON")):
+            with self.subTest(failure=type(failure).__name__):
+                source = GithubSource("team/app")
+                original = Mock(status_code=200)
+                original.json.side_effect = failure
+                mirror = Mock(status_code=200)
+                mirror.json.return_value = {"tag_name": "v1.2.3", "assets": []}
+                with patch("backend.managers.mgr_update._request_update", side_effect=[original, mirror]) as request:
+                    self.assertEqual(source._request_release("team", "app")["tag_name"], "v1.2.3")
+                self.assertEqual(request.call_args_list[1].args[0], "https://gh-proxy.org/https://api.github.com/repos/team/app/releases/latest")
+                self.assertEqual(source.check_detail["access_path"], "builtin_mirror")
+                self.assertIn("fallback_reason", source.check_detail)
+                original.close.assert_called_once()
+                mirror.close.assert_called_once()
+
+    def test_official_missing_release_does_not_consult_stale_mirror(self):
+        source = GithubSource("team/app")
+        with patch("backend.managers.mgr_update._request_update", return_value=Mock(status_code=404)) as request:
+            self.assertIsNone(source._request_release("team", "app"))
+        self.assertEqual(request.call_count, 1)
+
+    def test_failed_original_and_mirror_are_not_reported_as_no_update(self):
+        source = GithubSource("team/app")
+        with patch("backend.managers.mgr_update._request_update", side_effect=requests.Timeout("slow")) as request:
+            with self.assertRaises(UpdateSourceError):
+                source._request_release("team", "app")
+        self.assertEqual(request.call_count, 2)
+
     def test_check_routes_release_asset_through_selected_mirror_with_direct_fallback(self):
         source = GithubSource("Inky-Feather/RimCrow")
         release = {
@@ -49,13 +153,13 @@ class TestGithubUpdateSource(unittest.TestCase):
         }
         with patch("backend.managers.mgr_update.__version__", "0.22.6"), \
              patch("backend.utils.tools.platform.system", return_value="Windows"), \
-             patch.object(source.github_mgr, "fetch_release", return_value=release), \
+             patch.object(source, "_request_release", return_value=release), \
              patch.object(settings.config, "github_mirror_id", "custom:custom"), \
              patch.object(settings.config, "github_mirrors", [{"id": "custom", "url_template": "https://mirror.example/{url}", "support": {"release_asset": {"status": "supported"}}}]):
             info = source.check()
 
-        self.assertEqual(info.download_url, "https://mirror.example/https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip")
-        self.assertEqual(info.fallback_urls, ["https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip"])
+        self.assertEqual(info.download_url, "https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip")
+        self.assertEqual(info.fallback_urls, ["https://gh-proxy.org/https://github.com/Inky-Feather/RimCrow/releases/download/v0.22.7/app.zip"])
 
     def test_check_returns_github_release_asset_update(self):
         source = GithubSource("Inky-Feather/RimCrow")
@@ -81,7 +185,7 @@ class TestGithubUpdateSource(unittest.TestCase):
 
         with patch("backend.managers.mgr_update.__version__", "0.22.6"), \
             patch("backend.utils.tools.platform.system", return_value="Windows"), \
-            patch.object(source.github_mgr, "fetch_release", return_value=releases[0]):
+            patch.object(source, "_request_release", return_value=releases[0]):
             info = source.check()
 
         self.assertIsNotNone(info)
@@ -108,7 +212,7 @@ class TestGithubUpdateSource(unittest.TestCase):
         manager.download_mgr = StubDownloadManager()
         with patch("backend.managers.mgr_update.__version__", "0.22.6"), \
              patch("backend.utils.tools.platform.system", return_value="Windows"), \
-             patch.object(source.github_mgr, "fetch_release", return_value=release), \
+             patch.object(source, "_request_release", return_value=release), \
              patch.object(settings.config, "github_mirror_id", "custom:custom"), \
              patch.object(settings.config, "github_mirrors", [{"id": "custom", "url_template": "https://mirror.example/{url}", "support": {"release_asset": {"status": "supported"}}}]):
             info = manager.check_all()
@@ -137,7 +241,7 @@ class TestAdditionalUpdateSources(unittest.TestCase):
         response.headers = {"Content-Length": "74733041", "Content-Disposition": 'attachment; filename="RimCrow-v0.24.12-windows.zip"'}
         response.url = "https://twds.dl.sourceforge.net/project/rimcrow/v0.24.12/RimCrow-v0.24.12-windows.zip"
         response.history = []
-        with patch("backend.managers.mgr_update.__version__", "0.24.11"), patch("backend.managers.mgr_update.build_retry_session") as build:
+        with patch("backend.managers.mgr_update.__version__", "0.24.11"), patch("backend.utils.tools.platform.system", return_value="Windows"), patch("backend.managers.mgr_update.build_retry_session") as build:
             session = build.return_value.__enter__.return_value
             session.get.return_value = response
             info = SourceForgeSource("https://sourceforge.net/projects/rimcrow").check()
@@ -145,7 +249,7 @@ class TestAdditionalUpdateSources(unittest.TestCase):
         session.get.assert_called_once()
         self.assertEqual(session.get.call_args.args[0], "https://sourceforge.net/projects/rimcrow/files/latest/download?format=json")
         self.assertEqual(info.version, "0.24.12")
-        self.assertEqual(info.download_url, "https://sourceforge.net/projects/rimcrow/files/latest/download?format=json")
+        self.assertEqual(info.download_url, response.url)
         self.assertEqual(info.file_size, "71.3 MB")
         response.close.assert_called_once()
 
@@ -209,7 +313,7 @@ class TestAdditionalUpdateSources(unittest.TestCase):
             }
         ]
 
-        with patch("backend.managers.mgr_update.__version__", "0.22.6"), patch.object(source.github_mgr, "fetch_release", return_value=releases[0]):
+        with patch("backend.managers.mgr_update.__version__", "0.22.6"), patch.object(source, "_request_release", return_value=releases[0]):
             info = source.check()
 
         self.assertIsNone(info)
@@ -230,7 +334,7 @@ class TestAdditionalUpdateSources(unittest.TestCase):
             }
         ]
 
-        with patch("backend.managers.mgr_update.__version__", "0.22.6"), patch.object(source.github_mgr, "fetch_release", return_value=releases[0]):
+        with patch("backend.managers.mgr_update.__version__", "0.22.6"), patch.object(source, "_request_release", return_value=releases[0]):
             info = source.check()
 
         self.assertIsNone(info)
@@ -419,6 +523,56 @@ class TestLanzouUpdatePackageNames(unittest.TestCase):
 
 
 class TestUpdateManagerSources(unittest.TestCase):
+    def test_checks_run_concurrently_without_changing_source_priority(self):
+        ready = threading.Barrier(2)
+
+        class ParallelSource:
+            def __init__(self, name):
+                self.name = name
+
+            def check(self):
+                ready.wait(timeout=2)
+                if self.name == "first":
+                    time.sleep(0.03)
+                return UpdateInfo(True, "1.2.3", "", f"https://example.org/{self.name}.zip", self.name)
+
+        manager = self._manager_with_sources([])
+        manager.sources = [ParallelSource("first"), ParallelSource("second")]
+        with patch.object(manager, "_find_cached_file", return_value=None):
+            info = manager.check_all()
+        self.assertEqual([item["source_name"] for item in info.sources], ["first", "second"])
+
+    def test_overall_deadline_keeps_completed_results_and_discards_late_results(self):
+        release = threading.Event()
+        finished = threading.Event()
+
+        class SlowSource:
+            def check(self):
+                try:
+                    release.wait(timeout=2)
+                    return UpdateInfo(True, "9.9.9", "", "https://example.org/late.zip", "late")
+                finally:
+                    finished.set()
+
+        manager = self._manager_with_sources([UpdateInfo(True, "1.2.3", "", "https://example.org/ok.zip", "ok")])
+        manager.sources.append(SlowSource())
+        try:
+            with patch("backend.managers.mgr_update.UPDATE_CHECK_TIMEOUT_SECONDS", 0.1), patch.object(manager, "_find_cached_file", return_value=None):
+                info = manager.check_all()
+            self.assertEqual(info.version, "1.2.3")
+            self.assertEqual(info.check_status, "partial")
+            self.assertEqual(info.source_results[1]["status"], "failed")
+        finally:
+            release.set()
+            self.assertTrue(finished.wait(timeout=2))
+        self.assertEqual(manager.current_update_info.version, "1.2.3")
+
+    def test_active_download_snapshot_is_not_replaced_by_check(self):
+        manager = self._manager_with_sources([UpdateInfo(True, "9.9.9", "", "https://example.org/new.zip", "new")])
+        active = UpdateInfo(True, "1.2.3", "", "https://example.org/current.zip", "current", local_status="downloading")
+        manager.current_update_info = active
+        self.assertIs(manager.check_all(), active)
+
     def _manager_with_sources(self, infos):
         manager = UpdateManager()
         manager.sources = [StubUpdateSource(info) for info in infos]
@@ -544,6 +698,39 @@ class TestUpdateManagerSources(unittest.TestCase):
         self.assertEqual(manager.current_update_info.version, "0.22.7")
         self.assertEqual(manager.current_update_info.source_name, "蓝奏云")
         self.assertEqual(manager.current_update_info.local_status, "ready")
+
+    def test_download_fallback_and_completion_preserve_check_details(self):
+        manager = self._manager_with_sources([])
+        info = UpdateInfo(True, "99.0.0", "更新", "https://example.invalid/first.zip", "First")
+        info.sources = [info.to_source_dict(), UpdateInfo(True, "99.0.0", "更新", "https://example.invalid/backup.zip", "Backup").to_source_dict()]
+        info.check_status = "partial"
+        info.source_results = [{"source_name": "GitHub", "status": "update", "access_path": "builtin_mirror"}]
+        manager.current_update_info = info
+        first = manager.perform_update_download()
+        task = DownloadTask(url=info.download_url, dest_path="F:/tmp/update.zip")
+        task.task_id = first["task_id"]
+        task.metadata = manager.download_mgr.tasks[0]["metadata"]
+        with patch("backend.managers.mgr_update.EventBus.emit_progress"), \
+            patch("backend.managers.mgr_update.os.path.exists", return_value=True), \
+            patch.object(manager, "_save_metadata_file"), patch.object(manager, "_clean_old_cache"):
+            manager._on_download_error(task)
+            self.assertEqual(manager.current_update_info.source_name, "Backup")
+            task.task_id = manager.active_download_task_id
+            manager._on_download_complete(task)
+        self.assertEqual(manager.current_update_info.check_status, "partial")
+        self.assertEqual(manager.current_update_info.source_results, info.source_results)
+        self.assertEqual(manager.current_update_info.local_status, "ready")
+
+    def test_check_does_not_replace_a_download_started_during_check(self):
+        manager = self._manager_with_sources([])
+        downloaded = UpdateInfo(True, "99.0.0", "", "", "GitHub", local_status="downloading")
+        newer = UpdateInfo(True, "99.1.0", "", "", "GitHub")
+        def finish_check():
+            manager.current_update_info = downloaded
+            return newer
+        with patch.object(manager, "_check_sources", side_effect=finish_check):
+            self.assertIs(manager.check_all(), downloaded)
+        self.assertIs(manager.current_update_info, downloaded)
 
     def test_hot_swap_from_rimmodmanager_launches_rimcrow_exe(self):
         with tempfile.TemporaryDirectory() as temp_dir:

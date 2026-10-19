@@ -18,6 +18,8 @@ const normalizePromptItem = (item = {}) => ({
   description: String(item.description || item.message || '').trim(),
   descriptionFormat: String(item.descriptionFormat || item.description_format || 'text').trim().toLowerCase(),
   meta: Array.isArray(item.meta) ? item.meta.map(value => String(value || '').trim()).filter(Boolean) : [],
+  detailsTitle: String(item.detailsTitle || '').trim(),
+  details: Array.isArray(item.details) ? item.details.map(detail => ({ label: String(detail.label || ''), value: String(detail.value || '') })) : [],
   status: 'pending',
   statusMessage: '',
   actions: (item.actions || []).map(normalizeAction).filter(action => action.id && action.label),

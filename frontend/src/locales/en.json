@@ -1017,7 +1017,8 @@
     "update": {
       "download_started": "Started downloading update package",
       "installing_restart": "Restarting and installing the update.",
-      "no_available_info": "No update information is available. Check for updates first."
+      "no_available_info": "No update information is available. Check for updates first.",
+      "result_changed": "Update information has changed. Please view the update again."
     },
     "uri": {
       "no_link_to_open": "No link to open.",
@@ -4922,8 +4923,7 @@
       "download_started": "Update download started. Watch the status bar for progress.",
       "install_cancelled": "Update installation cancelled.",
       "partial_no_update": "Some update sources are unavailable. No new version was found from the available sources.",
-      "recommend_scan": "Run a full scan to apply the new version's core engine features.",
-      "up_to_date": "You are already on the latest version."
+      "recommend_scan": "Run a full scan to apply the new version's core engine features."
     },
     "workspace": {
       "cleanup_deleted_done": "Cleaned {count} deleted records",
@@ -6928,17 +6928,34 @@
       }
     },
     "update": {
+      "auto_source_message": "If a download fails, backup addresses will be tried automatically. If it still fails, use a download link in Settings → About to get the package for your system, then exit the app and extract the package into the installation folder, replacing existing files.",
       "available_desc": "An update is available.",
+      "check_failed": "Unable to check for updates. Please try again later.",
+      "checking_sources": "Checking update sources…",
+      "download_update": "Download update",
       "downloaded": "Downloaded",
+      "downloading": "Downloading update; see the task bar for progress",
       "file_size_meta": "File size: {size}",
       "ignore_version": "Ignore this version",
       "install_now": "Install now",
+      "last_checked": "Last checked: {time}",
       "later": "Later",
-      "multiple_sources_message": "Multiple sources were found for the same version: {sources}. The first source will be used first, and fallback sources will be tried automatically if it fails.",
       "new_version_title": "New version v{version} available",
-      "single_source_message": "Source: {source}. File size: {size}.",
-      "source_meta": "Source: {source}",
-      "update_now": "Update now"
+      "no_compatible_update": "No new version for this system was found",
+      "not_checked": "Updates have not been checked yet",
+      "partial_available": "Some sources could not be checked. You can still use the update found on other sources.",
+      "ready": "The update package is ready. You can install it later.",
+      "result_changed": "Update information has changed. Please view the update again.",
+      "source_available": "This version is available",
+      "source_details": "Source details",
+      "source_failed": "Temporarily unable to check",
+      "source_no_package": "No compatible update package",
+      "source_no_release": "No release published yet",
+      "source_no_update": "No new version found",
+      "source_older": "Target version not yet available (v{version})",
+      "version_available": "New version v{version} available",
+      "via_builtin_mirror": " · Read through the built-in mirror",
+      "view_update": "View update"
     },
     "update_modal": {
       "empty": "No update records found...",

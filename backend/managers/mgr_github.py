@@ -105,6 +105,7 @@ GITHUB_MIRROR_PROBE_TARGETS = {
     "gist": "https://gist.githubusercontent.com/octocat/9257657/raw",
     "git_clone": "https://github.com/octocat/Hello-World.git/info/refs?service=git-upload-pack",
     "release_asset": "https://github.com/NVIDIA/cccl/releases/download/v3.2.0/cccl-src-v3.2.0.zip",
+    "lfs_media": "https://media.githubusercontent.com/media/onnx/models/main/validated/vision/classification/mnist/model/mnist-12.onnx",
 }
 GITHUB_MIRROR_HEALTH_SECONDS = 12 * 3600
 GITHUB_MIRROR_SUPPORT_SECONDS = 30 * 86400
@@ -276,10 +277,14 @@ class GithubManager:
             "origin": "builtin",
             "enabled": True,
             "support": {
-                "web": {"status": "supported"},
+                "web": {"status": "unsupported"},
                 "raw": {"status": "supported"},
                 "archive": {"status": "supported"},
                 "release_asset": {"status": "supported"},
+                "api": {"status": "supported"},
+                "gist": {"status": "supported"},
+                "git_clone": {"status": "supported"},
+                "lfs_media": {"status": "unsupported"},
             },
             "health": {},
         }]
@@ -633,7 +638,8 @@ class GithubManager:
         if host == "api.github.com": return "api"
         if host == "raw.githubusercontent.com": return "raw"
         if host == "codeload.github.com": return "archive"
-        if host in {"gist.github.com", "gist.githubusercontent.com"}: return "gist"
+        if host == "gist.githubusercontent.com": return "gist"
+        if host == "gist.github.com": return "gist" if re.match(r"^/[^/]+/[^/]+/raw(?:/|$)", parsed.path) else "web"
         if host == "media.githubusercontent.com": return "lfs_media"
         if host not in {"github.com", "www.github.com"}: return None
         if "/releases/download/" in parsed.path: return "release_asset"
@@ -665,17 +671,25 @@ class GithubManager:
         if not mirror_url or not GithubManager._valid_mirror_template(template):
             return mirror_url, {"status": "unsupported", "reason": "镜像地址或资源类型不匹配"}
         capability = GithubManager.github_url_capability(target) or "raw"
+        max_body_size = 65536 if capability == "web" else 8192
         started = time.monotonic()
         try:
             with build_retry_session(total=0) as session:
-                with session.get(mirror_url, headers={"Range": "bytes=0-8191", "Accept-Encoding": "identity"}, timeout=(5, 15), stream=True) as response:
+                with session.get(mirror_url, headers={"Range": f"bytes=0-{max_body_size - 1}", "Accept-Encoding": "identity"}, timeout=(5, 15), stream=True) as response:
                     status = int(response.status_code)
                     result = {"http_status": status, "latency_ms": round((time.monotonic() - started) * 1000)}
                     if status not in {200, 206}:
                         return mirror_url, {**result, "status": "unknown" if status in {401, 403, 408, 429} or status >= 500 else "unsupported", "reason": "服务返回 HTTP 错误"}
                     if urlparse(response.url).hostname in GITHUB_DOWNLOAD_HOSTS:
                         return mirror_url, {**result, "status": "unsupported", "reason": "节点跳回原站，未提供镜像访问"}
-                    body = next(response.iter_content(8192), b"")[:8192]
+                    chunks = []
+                    body_size = 0
+                    for chunk in response.iter_content(1024):
+                        chunks.append(chunk)
+                        body_size += len(chunk)
+                        if body_size >= max_body_size:
+                            break
+                    body = b"".join(chunks)[:max_body_size]
                     content_type = str(response.headers.get("Content-Type") or "").lower()
                     lower = body.lstrip().lower()
                     is_html = "text/html" in content_type or lower.startswith((b"<!doctype html", b"<html"))
@@ -683,8 +697,10 @@ class GithubManager:
                         valid = "json" in content_type and b"octocat/Hello-World" in body
                     elif capability == "git_clone":
                         valid = b"# service=git-upload-pack" in body
-                    elif capability in {"web", "gist"}:
-                        valid = is_html and b"github" in body.lower() and b"captcha" not in body.lower()
+                    elif capability == "web":
+                        # 代理首页也常包含 GitHub 字样，必须核对原站的仓库元数据。
+                        repo_path = urlparse(target).path.strip("/").encode()
+                        valid = is_html and b'octolytics-dimension-repository_nwo' in body and repo_path in body and b"captcha" not in body.lower()
                     elif capability in {"archive", "release_asset"}:
                         valid = body.startswith(b"PK\x03\x04")
                     else:

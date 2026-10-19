@@ -11,6 +11,10 @@ import zipfile
 import requests
 import platform
 import re
+import copy
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from urllib.parse import urlsplit
 from packaging import version
 from backend._version import __version__
@@ -28,11 +32,37 @@ from backend.utils.tools import get_current_package_platform_keywords, get_packa
 
 # 确保缓存目录存在
 os.makedirs(UPDATE_DIR, exist_ok=True)
+UPDATE_CHECK_TIMEOUT_SECONDS = 30
+_UPDATE_CHECK_CONTEXT = threading.local()
+
+
+def _check_update_cancelled() -> None:
+    stop_requested = getattr(_UPDATE_CHECK_CONTEXT, "stop_requested", None)
+    if (stop_requested is not None and stop_requested.is_set()) or time.monotonic() >= getattr(_UPDATE_CHECK_CONTEXT, "deadline", float("inf")):
+        raise requests.Timeout("更新检查已超时或取消")
+
+
+def _check_update_source(source: "UpdateSource", stop_requested: threading.Event, deadline: float) -> tuple[Optional["UpdateInfo"], dict[str, Any]]:
+    _UPDATE_CHECK_CONTEXT.stop_requested = stop_requested
+    _UPDATE_CHECK_CONTEXT.deadline = deadline
+    try:
+        source.checked_version = ""
+        source.check_detail = {}
+        _check_update_cancelled()
+        info = source.check()
+        _check_update_cancelled()
+        return info, {"version": source.checked_version, **source.check_detail}
+    finally:
+        _UPDATE_CHECK_CONTEXT.__dict__.clear()
 
 
 def _request_update(url: str, **kwargs: Any) -> requests.Response:
     """通过统一 RoutedSession 请求更新资源，避免更新链路绕过代理/Hosts 路由。"""
-    with build_retry_session(route_manager=network_mgr) as session:
+    _check_update_cancelled()
+    remaining = max(0.1, getattr(_UPDATE_CHECK_CONTEXT, "deadline", float("inf")) - time.monotonic())
+    timeout = kwargs.get("timeout", (5, 15))
+    kwargs["timeout"] = tuple(min(value, remaining) for value in timeout) if isinstance(timeout, tuple) else min(timeout, remaining)
+    with build_retry_session(route_manager=network_mgr, total=0) as session:
         return session.get(url, **kwargs)
 
 def _build_env_cleanup_commands() -> str:
@@ -160,16 +190,18 @@ class LanzouSource(UpdateSource):
     def __init__(self, folder_url: str, password: str = ""):
         self.url = folder_url
         self.pwd = password
-        self.parser = LanzouParser()
 
     def check(self):
-        data = self.parser.get_all_files(self.url, self.pwd)
+        with build_retry_session(route_manager=False, trust_env=False, total=0) as session:
+            parser = LanzouParser(session, check_cancelled=_check_update_cancelled)
+            data = parser.get_all_files(self.url, self.pwd)
         if not data:
             raise UpdateSourceError("蓝奏云更新源未返回有效数据")
         if not data.get('latest'): return None
         
         latest = data['latest']
         remote_v = latest['version']
+        self.checked_version = remote_v
         
         if version.parse(remote_v) > version.parse(__version__):
             return UpdateInfo(
@@ -236,13 +268,17 @@ class SourceForgeSource(UpdateSource):
             remote_v, filename = self._extract_release_info(response)
             if not remote_v:
                 raise UpdateSourceError("SourceForge 未能从最新下载地址解析版本号")
+            self.checked_version = remote_v
+            if filename and (not has_supported_update_package_name(filename) or not get_package_platform_match(filename)[0]):
+                self.check_detail = {"status": "no_package"}
+                return None
             if version.parse(remote_v) <= version.parse(__version__):
                 return None
             return UpdateInfo(
                 has_update=True,
                 version=remote_v,
                 changelog="SourceForge 最新发布包",
-                download_url=self.latest_download_url,
+                download_url=str(response.url),
                 source_name="SourceForge",
                 file_size=self._format_size(response.headers.get("Content-Length")),
                 publish_time=str(response.headers.get("Last-Modified") or ""),
@@ -331,6 +367,7 @@ class ManifestSource(UpdateSource):
         remote_version = str(payload.get("version") or "").strip().lstrip("v")
         if not remote_version:
             raise UpdateSourceError("更新清单缺少版本号")
+        self.checked_version = remote_version
         try:
             if version.parse(remote_version) <= version.parse(__version__):
                 return None
@@ -390,26 +427,29 @@ class ManifestSource(UpdateSource):
 class GithubSource(UpdateSource):
     def __init__(self, repo: str):
         self.repo = repo
-        self.github_mgr = GithubManager()
 
     def check(self) -> Optional[UpdateInfo]:
         try:
             owner, repo = self._parse_repo()
-            release = self.github_mgr.fetch_release(owner, repo, missing_ok=True)
-            if not release: return None
+            release = self._request_release(owner, repo)
+            if not release:
+                self.check_detail = {"status": "no_release"}
+                return None
             if release.get("draft") or release.get("prerelease"): return None
 
             remote_v = self._normalize_version(release.get("tag_name") or release.get("name") or "")
+            self.checked_version = remote_v
             if not remote_v or version.parse(remote_v) <= version.parse(__version__): return None
 
             asset = self._select_asset(release.get("assets") or [])
             if not asset:
                 logger.warning(f"GitHub 更新源未找到适合当前系统的 zip 附件: repo={self.repo}, version={remote_v}")
+                self.check_detail = {**getattr(self, "check_detail", {}), "status": "no_package"}
                 return None
 
             hash_algorithm, file_hash = self._parse_asset_digest(asset.get("digest"))
             download_url = str(asset.get("browser_download_url") or "")
-            candidates = self.github_mgr._github_download_candidates(download_url, "release_asset")
+            candidates = self._download_candidates(download_url)
             primary = UpdateInfo(
                 has_update=True,
                 version=remote_v,
@@ -428,6 +468,41 @@ class GithubSource(UpdateSource):
             raise UpdateSourceError(f"GitHub 更新源请求失败: {e}") from e
         except Exception as e:
             raise UpdateSourceError(f"GitHub 更新源解析失败: {e}") from e
+
+    def _request_release(self, owner: str, repo: str) -> Optional[Dict[str, Any]]:
+        """更新专用公开读取：原站优先，固定内置镜像兜底，不转发账号凭据。"""
+        original_url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+        last_error = None
+        for url in self._download_candidates(original_url):
+            _check_update_cancelled()
+            response = None
+            try:
+                response = _request_update(url, timeout=(5, 10), headers={"Accept": "application/vnd.github+json", "User-Agent": "RimCrow/UpdateChecker"})
+                if response.status_code == 404:
+                    return None
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict) or not str(payload.get("tag_name") or "").strip() or not isinstance(payload.get("assets"), list):
+                    raise ValueError("Release 响应缺少有效的版本或附件列表")
+                version.parse(self._normalize_version(payload["tag_name"]))
+                self.check_detail = {"access_path": "original" if url == original_url else "builtin_mirror"}
+                if last_error:
+                    self.check_detail["fallback_reason"] = str(last_error)
+                return payload
+            except (requests.RequestException, ValueError) as exc:
+                last_error = exc
+                logger.warning("GitHub 更新检查访问失败，将尝试剩余候补：url=%s error=%s", url, exc)
+            finally:
+                if response is not None:
+                    response.close()
+        raise UpdateSourceError("GitHub 原始与内置镜像更新检查均失败") from last_error
+
+    @staticmethod
+    def _download_candidates(url: str) -> List[str]:
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or parsed.username or parsed.password or parsed.hostname not in {"github.com", "api.github.com"}:
+            return [url] if url else []
+        return [url, f"https://gh-proxy.org/{url}"]
 
     def _parse_repo(self) -> tuple[str, str]:
         parts = [part for part in str(self.repo or "").strip().strip("/").split("/") if part]
@@ -508,12 +583,14 @@ class GiteeSource(GithubSource):
                 headers={"Accept": "application/json", "User-Agent": "RimCrow/UpdateChecker"},
             )
             if response.status_code == 404:
+                self.check_detail = {"status": "no_release"}
                 return None
             response.raise_for_status()
             release = response.json()
             if not isinstance(release, dict) or release.get("prerelease") or release.get("draft"):
                 return None
             remote_v = self._normalize_version(release.get("tag_name") or release.get("name") or "")
+            self.checked_version = remote_v
             if not remote_v or version.parse(remote_v) <= version.parse(__version__):
                 return None
             # Gitee 不同 API 版本可能返回 browser_download_url 或 download_url。
@@ -533,6 +610,7 @@ class GiteeSource(GithubSource):
             asset = self._select_asset(normalized_assets)
             if not asset:
                 logger.warning(f"Gitee 更新源未找到适合当前系统的 zip 附件: repo={self.repo}, version={remote_v}")
+                self.check_detail = {"status": "no_package"}
                 return None
             digest = asset.get("digest")
             if not digest and asset.get("sha256"):
@@ -659,10 +737,22 @@ class UpdateManager:
         self.active_download_task_id: Optional[str] = None
         self.active_download_version: Optional[str] = None
         self.download_contexts: Dict[str, Dict[str, Any]] = {}
+        self._check_lock = threading.Lock()
 
     def check_all(self) -> UpdateInfo:
+        with self._check_lock:
+            # 下载或待安装时保留任务快照，不能被一次新检查换成另一个版本。
+            if self.current_update_info and self.current_update_info.local_status in {"downloading", "ready"}:
+                return self.current_update_info
+            info = self._check_sources()
+            if self.current_update_info and self.current_update_info.local_status in {"downloading", "ready"}:
+                return self.current_update_info
+            self.current_update_info = info
+            return info
+
+    def _check_sources(self) -> UpdateInfo:
         """
-        遍历所有源直到找到一个有效的返回结果。
+        并发检查各源，按版本和配置顺序汇总结果。
         聚合检查逻辑：
         1. 检查远程源是否有新版本。
         2. 如果有远程新版本，检查本地 Cache 是否已经下载了该版本。
@@ -674,20 +764,31 @@ class UpdateManager:
         remote_success_count = 0
         remote_failure_count = 0
         
-        # 1. 遍历所有源，收集可用更新。只有最高版本相同的来源才会合并展示。
-        for src in self.sources:
+        # 并发只改变等待方式；按配置顺序收集，不能让响应速度改变下载优先级。
+        stop_requested = threading.Event()
+        deadline = time.monotonic() + UPDATE_CHECK_TIMEOUT_SECONDS
+        pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="update-check")
+        jobs = [pool.submit(_check_update_source, copy.copy(src), stop_requested, deadline) for src in self.sources]
+        try:
+            done, _ = wait(jobs, timeout=UPDATE_CHECK_TIMEOUT_SECONDS)
+        finally:
+            stop_requested.set()
+            pool.shutdown(wait=False, cancel_futures=True)
+        for src, future in zip(self.sources, jobs):
             source_name = self._source_display_name(src)
             is_remote_source = not isinstance(src, LocalSource)
             if is_remote_source:
                 remote_source_count += 1
             try:
-                info = src.check()
+                if future not in done:
+                    raise requests.Timeout("更新源未在检查时限内完成")
+                info, detail = future.result()
                 if info and info.has_update:
                     parsed_version = version.parse(info.version)
                     candidates.append((parsed_version, info))
-                    source_results.append({"source_name": source_name, "status": "update", "version": info.version})
+                    source_results.append({"source_name": source_name, **detail, "status": "update", "version": info.version})
                 else:
-                    source_results.append({"source_name": source_name, "status": "no_update"})
+                    source_results.append({"source_name": source_name, "status": "no_update", **detail})
                 if is_remote_source:
                     remote_success_count += 1
             except Exception as e:
@@ -756,7 +857,6 @@ class UpdateManager:
         selected.sources = [item.to_source_dict() for item in latest_sources]
         selected.check_status = "partial" if remote_failure_count else "ok"
         selected.source_results = source_results
-        self.current_update_info = selected
         return selected
 
     @staticmethod
@@ -861,7 +961,7 @@ class UpdateManager:
         self.active_download_task_id = task_id
         self.active_download_version = info.version
         self.download_contexts[task_id] = {
-            "info": info.to_source_dict(),
+            "info": info.to_dict(),
             "sources": sources,
             "attempted_source_keys": attempted_keys,
         }
@@ -936,6 +1036,8 @@ class UpdateManager:
             if not next_info:
                 self._emit_final_download_error(task, tr("errors.update.fallback_source_invalid", "候补更新源无效"))
                 return
+            next_info.check_status = current_info.get("check_status", "ok")
+            next_info.source_results = current_info.get("source_results")
             self.current_update_info = next_info
             logger.warning(f"更新源下载失败，尝试候补来源: failed={failed_source}, next={next_name}, version={next_source.get('version')}")
             EventBus.emit_progress(
@@ -1031,6 +1133,8 @@ class UpdateManager:
             local_status=str(source.get("local_status") or "remote"),
             local_file_path=source.get("local_file_path"),
             sources=sources,
+            check_status=str(source.get("check_status") or "ok"),
+            source_results=source.get("source_results"),
         )
 
     def _save_metadata_file(self, info: UpdateInfo):
