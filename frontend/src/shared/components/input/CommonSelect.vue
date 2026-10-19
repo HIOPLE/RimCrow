@@ -32,6 +32,7 @@
 
     <!-- 下拉面板 -->
     <FixedPopover
+      ref="popoverRef"
       :trigger-ref="inputRef" :is-open="isOpen"
       :placement="menuPlacement"
       :z-index="popoverZIndex"
@@ -89,7 +90,7 @@ const props = defineProps({
   options: { type: Array, default: () => [] }, // { label, value, ... }
   mini: { type: Boolean, default: false },
   showBottom: { type: Boolean, default: false }, // 默认向下展开
-  popoverZIndex: { type: [Number, String], default: 8000 }, // 特殊高层浮窗可抬高下拉层级，普通场景保持默认。
+  popoverZIndex: { type: [Number, String], default: null }, // 只调整所属主体内的顺序，不抬高到其它弹窗上方。
   editable: { type: Boolean, default: false }, // 是否可输入
   disabled: { type: Boolean, default: false },
 })
@@ -99,6 +100,7 @@ const emit = defineEmits(['update:modelValue', 'change', 'visible-change'])
 // --- 状态 ---
 const isOpen = ref(false)
 const inputRef = ref(null)
+const popoverRef = ref(null)
 const optionRefs = ref([])
 const highlightedIndex = ref(-1) // 键盘导航索引
 const internalSearch = ref('') // 编辑模式下的搜索词
@@ -272,9 +274,11 @@ const handleBlur = () => {
 
 // 5. 键盘导航
 const handleKeydown = (e) => {
+  if (isOpen.value && !popoverRef.value?.isInteractive()) return
   if (!isOpen.value && e.key !== 'Tab') {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault()
+      e.stopPropagation()
       openMenu()
     }
     return
@@ -298,6 +302,7 @@ const handleKeydown = (e) => {
       break
     case 'Enter':
       e.preventDefault()
+      e.stopPropagation()
       if (highlightedIndex.value >= 0 && filteredOptions.value[highlightedIndex.value]) {
         // 用户明确用上下键选中了某一项
         selectOption(filteredOptions.value[highlightedIndex.value])
@@ -310,6 +315,7 @@ const handleKeydown = (e) => {
       break
     case 'Escape':
       e.preventDefault()
+      e.stopPropagation()
       closeMenu()
       break
     case 'Tab':
@@ -338,9 +344,9 @@ const setOptionRef = (el, index) => {
     optionRefs.value[index] = el
   }
 }
-const handlePopoverRequestClose = () => {
+const handlePopoverRequestClose = ({ reason } = {}) => {
   if (!isOpen.value) return
-  if (props.editable) commitInputValue()
+  if (props.editable && reason !== 'scope-hidden') commitInputValue()
   closeMenu()
 }
 // 每次更新前清空，防止内存泄漏和死循环

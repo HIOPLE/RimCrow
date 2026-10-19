@@ -668,7 +668,6 @@
       "multiplayer_compatibility_failed": "Failed to update the Multiplayer compatibility table.",
       "multiplayer_compatibility_started": "Multiplayer compatibility table update started",
       "path_or_url_missing": "Update URL or target path is not configured",
-      "reload_failed_after_success": "{message} Cache reload failed. Refresh manually later.",
       "update_start_failed": "Failed to start the external data update. Check the update URL, network connection, proxy settings, and target folder permissions.",
       "workshop_db_done": "Community Workshop database updated.",
       "workshop_db_failed": "Failed to update the community Workshop database.",
@@ -4833,9 +4832,6 @@
       "name_required": "Enter a rule name",
       "weight_clamped": "Dynamic weight was clamped to the allowed range (weight {weightMin}-{weightMax}, shift {shiftMin} to {shiftMax})."
     },
-    "rules": {
-      "community_reload_unavailable": "The rule engine is not initialized, so the community rule database cannot be reloaded now."
-    },
     "settings": {
       "about": {
         "copied": "Copied: {text}",
@@ -6948,13 +6944,15 @@
       "partial_available": "Some sources could not be checked. You can still use the update found on other sources.",
       "ready": "The update package is ready. You can install it later.",
       "result_changed": "Update information has changed. Please view the update again.",
-      "source_available": "This version is available",
+      "source_auto": "Automatic (recommended)",
+      "source_available": "New version v{version} found",
       "source_details": "Source details",
       "source_failed": "Temporarily unable to check",
       "source_no_package": "No compatible update package",
       "source_no_release": "No release published yet",
       "source_no_update": "No new version found",
       "source_older": "Target version not yet available (v{version})",
+      "source_selector": "Download source",
       "version_available": "New version v{version} available",
       "via_builtin_mirror": " · Read through the built-in mirror",
       "view_update": "View update"

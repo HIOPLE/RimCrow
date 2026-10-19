@@ -668,7 +668,6 @@
       "multiplayer_compatibility_failed": "Die Multiplayer-Kompatibilitätstabelle konnte nicht aktualisiert werden.",
       "multiplayer_compatibility_started": "Aktualisierung der Multiplayer-Kompatibilitätstabelle gestartet",
       "path_or_url_missing": "Update-URL oder Zielpfad ist nicht konfiguriert",
-      "reload_failed_after_success": "{message} Cache-Neuladen fehlgeschlagen. Später manuell aktualisieren.",
       "update_start_failed": "Aktualisierung externer Daten konnte nicht gestartet werden. Prüfen Sie Update-Adresse, Netzwerkverbindung, Proxy-Einstellungen und Schreibrechte des Zielordners.",
       "workshop_db_done": "Community Workshop-Datenbank aktualisiert.",
       "workshop_db_failed": "Die Community-Workshop-Datenbank konnte nicht aktualisiert werden.",
@@ -4833,9 +4832,6 @@
       "name_required": "Geben Sie einen Regelnamen ein",
       "weight_clamped": "Das dynamische Gewicht wurde auf den zulässigen Bereich begrenzt (Gewicht {weightMin}-{weightMax}, Verschiebung von {shiftMin} zu {shiftMax})."
     },
-    "rules": {
-      "community_reload_unavailable": "Die Regel-Engine ist nicht initialisiert, daher kann die Community-Regeldatenbank jetzt nicht neu geladen werden."
-    },
     "settings": {
       "about": {
         "copied": "Kopiert: {text}",
@@ -6948,13 +6944,15 @@
       "partial_available": "Einige Quellen konnten nicht geprüft werden. Das über andere Quellen gefundene Update ist weiterhin verfügbar.",
       "ready": "Das Update-Paket ist bereit und kann später installiert werden.",
       "result_changed": "Die Update-Informationen haben sich geändert. Bitte öffnen Sie das Update erneut.",
-      "source_available": "Diese Version ist verfügbar",
+      "source_auto": "Automatisch auswählen (empfohlen)",
+      "source_available": "Neue Version v{version} gefunden",
       "source_details": "Quellendetails",
       "source_failed": "Prüfung vorübergehend nicht möglich",
       "source_no_package": "Kein passendes Update-Paket",
       "source_no_release": "Noch keine Version veröffentlicht",
       "source_no_update": "Keine neue Version gefunden",
       "source_older": "Zielversion noch nicht verfügbar (v{version})",
+      "source_selector": "Downloadquelle",
       "version_available": "Neue Version v{version} verfügbar",
       "via_builtin_mirror": " · Über den integrierten Spiegel gelesen",
       "view_update": "Update anzeigen"

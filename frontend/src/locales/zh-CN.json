@@ -668,7 +668,6 @@
       "multiplayer_compatibility_failed": "Multiplayer 兼容表更新失败！",
       "multiplayer_compatibility_started": "Multiplayer 兼容表开始更新",
       "path_or_url_missing": "更新地址或目标路径未配置",
-      "reload_failed_after_success": "{message} 但重载失败，请稍后手动刷新。",
       "update_start_failed": "启动外部数据更新失败。请检查更新地址、网络连接、代理设置和目标目录写入权限。",
       "workshop_db_done": "社区工坊数据库更新完毕！",
       "workshop_db_failed": "社区工坊数据库更新失败！",
@@ -4833,9 +4832,6 @@
       "name_required": "请输入规则名称",
       "weight_clamped": "动态权重已自动限制到允许范围内（权重 {weightMin}-{weightMax}，偏移 {shiftMin} 到 {shiftMax}）。"
     },
-    "rules": {
-      "community_reload_unavailable": "规则引擎未初始化，无法立即重载社区规则库。"
-    },
     "settings": {
       "about": {
         "copied": "已复制：{text}",
@@ -6948,13 +6944,15 @@
       "partial_available": "部分来源暂时无法检查，不影响使用已发现的更新。",
       "ready": "安装包已就绪，可稍后安装",
       "result_changed": "更新信息已变化，请重新查看更新。",
-      "source_available": "已发现此版本",
+      "source_auto": "自动选择（推荐）",
+      "source_available": "发现新版本 v{version}",
       "source_details": "来源详情",
       "source_failed": "暂时无法检查",
       "source_no_package": "没有适用的安装包",
       "source_no_release": "尚未发布版本",
       "source_no_update": "未发现新版本",
       "source_older": "尚未同步目标版本（v{version}）",
+      "source_selector": "下载来源",
       "version_available": "发现新版本 v{version}",
       "via_builtin_mirror": " · 通过内置镜像读取",
       "view_update": "查看更新"

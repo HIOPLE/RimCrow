@@ -668,7 +668,6 @@
       "multiplayer_compatibility_failed": "Multiplayer 兼容表更新失敗！",
       "multiplayer_compatibility_started": "Multiplayer 兼容表開始更新",
       "path_or_url_missing": "更新地址或目標路徑未配置",
-      "reload_failed_after_success": "{message} 但重載失敗，請稍後手動重新整理。",
       "update_start_failed": "啟動外部資料更新失敗。請檢查更新位址、網路連線、代理設定和目標目錄寫入權限。",
       "workshop_db_done": "社區工坊資料庫更新完畢！",
       "workshop_db_failed": "社區工坊資料庫更新失敗！",
@@ -4833,9 +4832,6 @@
       "name_required": "請輸入規則名稱",
       "weight_clamped": "動態權重已自動限制到允許範圍內（權重 {weightMin}-{weightMax}，偏移 {shiftMin} 到 {shiftMax}）。"
     },
-    "rules": {
-      "community_reload_unavailable": "規則引擎未初始化，無法立即重載社區規則庫。"
-    },
     "settings": {
       "about": {
         "copied": "已複製：{text}",
@@ -6948,13 +6944,15 @@
       "partial_available": "部分來源暫時無法檢查，不影響使用已發現的更新。",
       "ready": "安裝套件已就緒，可稍後安裝",
       "result_changed": "更新資訊已變更，請重新查看更新。",
-      "source_available": "已發現此版本",
+      "source_auto": "自動選擇（推薦）",
+      "source_available": "發現新版本 v{version}",
       "source_details": "來源詳細資訊",
       "source_failed": "暫時無法檢查",
       "source_no_package": "沒有適用的安裝套件",
       "source_no_release": "尚未發佈版本",
       "source_no_update": "未發現新版本",
       "source_older": "尚未同步目標版本（v{version}）",
+      "source_selector": "下載來源",
       "version_available": "發現新版本 v{version}",
       "via_builtin_mirror": " · 透過內建鏡像讀取",
       "view_update": "查看更新"

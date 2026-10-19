@@ -2,7 +2,7 @@
   <Teleport to="body">
     <!-- 统一过渡容器 -->
     <Transition :name="isMini ? 'mini-zoom' : 'modal-fade'">
-      <div v-if="confirmStore.isVisible"
+      <div v-if="confirmStore.isVisible" data-popover-scope
         class="fixed inset-0 font-sans text-text-main selection:bg-bg-overlay/10"
         :style="{ zIndex: UI_Z_INDEX.CONFIRM }"
         :class="isMini ? 'pointer-events-none' : 'flex items-center justify-center'"
@@ -236,16 +236,18 @@
           </div>
 
         </div>
+        <div ref="popoverHost" class="pointer-events-none absolute inset-0 z-20 overflow-visible"></div>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script setup>
-import { computed, ref, nextTick, watch } from 'vue'
+import { computed, ref, nextTick, provide, watch } from 'vue'
 import { useConfirmStore } from './confirmStore'
 import CommonSelect from '../input/CommonSelect.vue'
 import { UI_Z_INDEX } from '../../lib/constants.js'
+import { POPOVER_PORTAL_KEY } from '../popover/popoverContext.js'
 import { useAppStore } from '../../../app/stores/appStore'
 import { onClickOutside, useWindowSize } from '@vueuse/core'
 import { Info, CircleAlert, CircleX, CircleCheckBig } from 'lucide-vue-next'
@@ -273,6 +275,10 @@ const chooseFooterAction = (action) => {
 }
 
 const modalRef = ref(null)
+const popoverHost = ref(null)
+provide(POPOVER_PORTAL_KEY, {
+  target: popoverHost, active: computed(() => confirmStore.isVisible), boundary: modalRef,
+})
 const inputRef = ref(null)
 const shake = ref(false)
 const richDescriptionHtml = ref({})
@@ -440,7 +446,7 @@ onClickOutside(modalRef, () => {
   if (isMini.value && confirmStore.isVisible) {
     confirmStore.cancel()
   }
-})
+}, { ignore: [popoverHost] })
 
 </script>
 

@@ -145,8 +145,8 @@
 
   <!-- 4. 编辑/创建 模态框 (标准 RulePanel 风格) -->
   <Transition name="fade">
-    <div v-if="showModal" class="fixed inset-0 z-150 flex items-center justify-center bg-bg-deep/40 p-4 backdrop-blur-md">
-      <div class="modal-surface flex max-h-[calc(100vh-2rem)] w-[min(52rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-bg-highlight/90 animate-scale-in">
+    <div v-if="showModal" data-popover-scope class="fixed inset-0 z-150 flex items-center justify-center bg-bg-deep/40 p-4 backdrop-blur-md">
+      <div ref="panelRef" class="modal-surface relative z-10 flex max-h-[calc(100vh-2rem)] w-[min(52rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-bg-highlight/90 animate-scale-in">
         <header class="modal-header flex items-center justify-between px-6 py-4">
           <h3 class="text-lg font-bold text-text-main">{{ isEditing ? t('ui.profiles.form.edit_title', '编辑环境属性') : t('ui.profiles.form.create_title', '创建新环境快照') }}</h3>
           <button @click="showModal = false" :disabled="submitting" :class="submitting ? 'app-action-disabled' : ''" class="text-text-dim hover:text-text-main"><X class="size-5" /></button>
@@ -182,12 +182,13 @@
           </button>
         </footer>
       </div>
+      <div ref="popoverHost" class="pointer-events-none absolute inset-0 z-20 overflow-visible"></div>
     </div>
   </Transition>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, provide, watch } from 'vue'
 import { Database, Plus, Trash2, Settings2, X, Play, AlertTriangle, SquareArrowOutUpRight, Package } from 'lucide-vue-next'
 import { toast } from '../../shared/lib/common'
 import { useProfileStore } from './profileStore'
@@ -201,6 +202,7 @@ import CommonTagInput from '../../shared/components/input/CommonTagInput.vue'
 import { getRunCommandTags } from '../../shared/lib/constants'
 import { formatDate } from '../../shared/lib/format'
 import { t, translateMessagePayload } from '../../shared/i18n.js'
+import { POPOVER_PORTAL_KEY } from '../../shared/components/popover/popoverContext.js'
 
 const profileStore = useProfileStore()
 const modStore = useModStore()
@@ -210,6 +212,9 @@ const runCommandTags = computed(() => getRunCommandTags())
 
 // --- 状态 ---
 const showModal = ref(false)
+const panelRef = ref(null)
+const popoverHost = ref(null)
+provide(POPOVER_PORTAL_KEY, { target: popoverHost, active: showModal, boundary: panelRef })
 const isEditing = ref(false)
 const gameInfo = ref('')
 const steamLaunchChecking = ref(false)
