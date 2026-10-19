@@ -969,7 +969,9 @@ export const useModStore = defineStore('mods', () => {
       console.warn("发现冲突:", conflictList.value)
       totalCount += conflictList.value.length
     }
-    if (totalCount > 0) {
+    if (detail?.runtime_sync?.ok === false) {
+      toast.warning(t('toast.mod.scan_link_sync_failed', '扫描完成，但模组链接同步失败，游戏可能无法加载当前模组。\n{reason}', { reason: detail.runtime_sync.message || '' }), { timeout: 10000 })
+    } else if (totalCount > 0) {
       // 注意：有冲突时暂不提示 "扫描完成" 的 Toast，以免遮挡，或者提示 Warning
       toast.warning(t('toast.mod.scan_conflicts_found', '扫描已完成，发现 {count} 个包名重复冲突需要处理。{extra}', { count: totalCount, extra: disabledStateText ? `\n${disabledStateText}` : '' }), {timeout: 10000})
     } else if (strictRestoreFailed > 0) {

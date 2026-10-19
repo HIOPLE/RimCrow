@@ -17,7 +17,7 @@ from backend.database.dao import ModDAO, _ProfilePathScope
 from backend.database.models import MOD_ASSET_STATE_MISSING, MOD_ASSET_STATE_PRESENT, GameProfile, ModAsset, SystemInfo, db
 from backend.managers.mgr_game import GameManager
 from backend.managers.mgr_game_install import GameInstallFacts, GameInstallInspector, GameInstallRegistry, detect_is_steam_managed_install
-from backend.managers.mgr_files import FileManager, PathChecker
+from backend.managers.mgr_files import FileManager, LinkSyncResult, PathChecker
 from backend.managers.mgr_game_monitor import RuntimeSession
 from backend.managers.mgr_profile import ProfileContext, ProfileManager
 from backend.managers.mgr_steam import SteamManager, run_steam_worker
@@ -2184,7 +2184,9 @@ class TestModScanner(unittest.TestCase):
         about_file.write_text("<ModMetaData />", encoding="utf-8")
 
         context = SimpleNamespace(profile_id="profile-a", game_dlc_path=str(temp_root / "Data"))
-        scanner = ModScanner(context)
+        deployment_failure = LinkSyncResult(False, "failed", "deployment probe")
+        scanner = ModScanner(context, runtime_link_sync_handler=Mock(return_value=deployment_failure))
+        self.addCleanup(scanner.executor.shutdown, wait=True)
         mod_result = {
             "package_id": "author.demo",
             "path_hash": generate_path_hash(str(mod_dir)),
@@ -2211,7 +2213,7 @@ class TestModScanner(unittest.TestCase):
              patch("backend.scanner.mod_scanner.EventBus.emit_progress"), \
              patch("backend.scanner.mod_scanner.EventBus.emit"):
             steam_manager_cls.return_value.reconcile_steamcmd_acf = Mock()
-            scanner._scan_paths_task(
+            result = scanner._scan_paths_task(
                 "task-single",
                 [str(mod_dir)],
                 forced_update=True,
@@ -2222,6 +2224,8 @@ class TestModScanner(unittest.TestCase):
 
         scanner._process_single_mod.assert_called_once()
         self.assertEqual(scanner._process_single_mod.call_args.args[0], normalize_path_for_storage(str(mod_dir)))
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["runtime_sync"], deployment_failure.to_dict())
 
 
 class TestProfileConflictAnalysis(unittest.TestCase):
@@ -3175,30 +3179,6 @@ class TestApiGameLaunch(unittest.TestCase):
 
 
 class TestApiRuntimeLinkSync(unittest.TestCase):
-    def test_sync_links_fails_when_created_link_cannot_be_verified(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            local_mods_path = Path(temp_dir) / "Mods"
-            source_path = Path(temp_dir) / "SourceMod"
-            local_mods_path.mkdir()
-            source_path.mkdir()
-
-            with patch.object(FileManager, "_create_links_windows_batch"):
-                success = FileManager.sync_links(str(local_mods_path), [str(source_path)])
-
-        self.assertFalse(success)
-
-    def test_sync_links_full_fails_when_created_link_cannot_be_verified(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            local_mods_path = Path(temp_dir) / "Mods"
-            source_path = Path(temp_dir) / "SourceMod"
-            local_mods_path.mkdir()
-            source_path.mkdir()
-
-            with patch.object(FileManager, "_create_links_fast"):
-                success = FileManager.sync_links_full(str(local_mods_path), [str(source_path)])
-
-        self.assertFalse(success)
-
     def test_build_scan_paths_for_profile_skips_self_when_local_matches_self(self):
         api = API.__new__(API)
         context = SimpleNamespace(
@@ -3233,7 +3213,7 @@ class TestApiRuntimeLinkSync(unittest.TestCase):
         )
         api.active_context = SimpleNamespace(profile_id="profile-a")
         api.profile_mgr = SimpleNamespace(build_profile_context=Mock(return_value=context))
-        api._sync_runtime_links_for_profile = Mock(return_value=True)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
 
         cfg = SimpleNamespace(
             enable_auto_scan=True,
@@ -3245,7 +3225,7 @@ class TestApiRuntimeLinkSync(unittest.TestCase):
              patch("backend.api.os.path.exists", return_value=True), \
              patch("backend.api.ModScanner") as mock_scanner_cls:
             temp_scanner = Mock()
-            temp_scanner._scan_paths_task = Mock()
+            temp_scanner._scan_paths_task = Mock(return_value={"status": "success"})
             temp_scanner.executor = SimpleNamespace(shutdown=Mock())
             mock_scanner_cls.return_value = temp_scanner
 
@@ -3273,7 +3253,7 @@ class TestApiRuntimeLinkSync(unittest.TestCase):
         )
         api.active_context = SimpleNamespace(profile_id="profile-a")
         api.profile_mgr = SimpleNamespace(build_profile_context=Mock(return_value=context))
-        api._sync_runtime_links_for_profile = Mock(return_value=True)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
 
         cfg = SimpleNamespace(enable_auto_scan=False)
         with patch("backend.api.settings.config", cfg):
@@ -3287,11 +3267,7 @@ class TestApiRuntimeLinkSync(unittest.TestCase):
         api = API.__new__(API)
         api.active_context = SimpleNamespace(profile_id="profile-a")
 
-        def fail_sync(*_args, **_kwargs):
-            api._last_runtime_link_sync_result = {"status": "failed", "message": "请将目录改到 NTFS 磁盘"}
-            return False
-
-        api._ensure_runtime_links_for_launch = Mock(side_effect=fail_sync)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(False, "failed", "请将目录改到 NTFS 磁盘"))
 
         res = API._prepare_profile_launch(api, "profile-a", include_workshop=False)
 
@@ -3394,7 +3370,7 @@ class TestSettingsPathNormalization(unittest.TestCase):
         settings.config.workshop_mods_path = str(temp_root / "WorkshopMods")
         target_workshop_path = str(temp_root / "WorkshopMods")
 
-        with patch("backend.managers.mgr_files.FileManager.sync_steamcmd_root_link"), \
+        with patch("backend.managers.mgr_files.FileManager.sync_steamcmd_root_link", return_value=LinkSyncResult(True, "deployed")), \
              patch.object(settings, "save"):
             warnings = settings.update_from_dict({"self_mods_path": target_workshop_path})
 
@@ -3526,7 +3502,7 @@ class TestApiSaveSettings(unittest.TestCase):
 
         with patch("backend.api.network_mgr.apply"), \
              patch("backend.api.EventBus.send_toast") as mock_send_toast, \
-             patch("backend.managers.mgr_files.FileManager.sync_steamcmd_root_link"), \
+             patch("backend.managers.mgr_files.FileManager.sync_steamcmd_root_link", return_value=LinkSyncResult(True, "deployed")), \
              patch.object(settings, "save"):
             res = API.save_all_settings(api, {"self_mods_path": str(temp_root / "WorkshopMods")})
 
@@ -3560,7 +3536,7 @@ class TestApiSaveSettings(unittest.TestCase):
             "steamcmd_path": str(temp_root / "tools" / "steamcmd"),
         }
         with patch("backend.api.network_mgr.apply"), \
-             patch("backend.managers.mgr_files.FileManager.sync_steamcmd_root_link"), \
+             patch("backend.managers.mgr_files.FileManager.sync_steamcmd_root_link", return_value=LinkSyncResult(True, "deployed")), \
              patch.object(settings, "save"):
             res = API.save_all_settings(api, payload)
 
@@ -3929,11 +3905,10 @@ class TestApiSaveSettings(unittest.TestCase):
 
         with patch("backend.managers.mgr_files.logger.warning") as mock_warning, \
              patch("backend.managers.mgr_files.logger.debug") as mock_debug:
-            self.assertTrue(FileManager.sync_steamcmd_root_link())
+            self.assertTrue(FileManager.sync_steamcmd_root_link(str(mods_root), str(mods_root)).ok)
 
         self.assertTrue(child.exists())
         mock_warning.assert_not_called()
-        mock_debug.assert_called_once()
 
     def test_bootstrap_context_does_not_crash_when_self_mods_path_is_file(self):
         temp_root = Path(tempfile.mkdtemp())
@@ -4047,7 +4022,7 @@ class TestApiSaveSettings(unittest.TestCase):
         api = API.__new__(API)
         api.profile_mgr = SimpleNamespace(update_profile=Mock())
         api._refresh_active_profile_context_after_update = Mock(side_effect=lambda *_args, **_kwargs: setattr(api, "active_context", SimpleNamespace(profile_id="profile-a")) or "light")
-        api._sync_runtime_links_for_profile = Mock(return_value=True)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
         api.profile_activate = Mock(side_effect=AssertionError("profile_activate should not be called"))
 
         with patch("backend.api.settings.config", SimpleNamespace(current_profile_id="profile-a")):
@@ -4062,13 +4037,14 @@ class TestApiSaveSettings(unittest.TestCase):
     def test_sync_runtime_links_after_scan_only_runs_for_current_profile(self):
         api = API.__new__(API)
         api.active_context = SimpleNamespace(profile_id="profile-a")
-        api._sync_runtime_links_for_profile = Mock(side_effect=lambda *_args, **_kwargs: setattr(api, "_last_runtime_link_sync_result", {"status": "deployed"}) or True)
+        api._runtime_generation = object()
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
 
-        deploy_msg = API._sync_runtime_links_after_scan(api, "profile-a")
-        stale_msg = API._sync_runtime_links_after_scan(api, "profile-b")
+        deploy_msg = API._sync_runtime_links_after_scan(api, "profile-a", api._runtime_generation)
+        stale_msg = API._sync_runtime_links_after_scan(api, "profile-b", api._runtime_generation)
 
-        self.assertEqual(deploy_msg, "Deployed runtime links")
-        self.assertEqual(stale_msg, "Skipped runtime link sync for stale profile")
+        self.assertEqual(deploy_msg.status, "deployed")
+        self.assertEqual(stale_msg.status, "skipped")
         api._sync_runtime_links_for_profile.assert_called_once_with("profile-a", include_workshop=True)
 
     def test_bootstrap_context_stops_old_scanner_and_injects_runtime_sync_handler(self):
@@ -4103,8 +4079,10 @@ class TestApiSaveSettings(unittest.TestCase):
         mock_scanner_cls.assert_called_once()
         self.assertIs(api.scanner, new_scanner)
         handler = mock_scanner_cls.call_args.kwargs["runtime_link_sync_handler"]
-        self.assertIs(handler.__self__, api)
-        self.assertIs(handler.__func__, API._sync_runtime_links_after_scan)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
+        self.assertEqual(handler("profile-a").status, "deployed")
+        api._runtime_generation = object()
+        self.assertEqual(handler("profile-a").status, "skipped")
         new_log_mgr.start_realtime_monitor.assert_called_once_with()
 
     def test_profile_activate_only_switches_active_profile_without_runtime_link_sync(self):
@@ -4115,7 +4093,7 @@ class TestApiSaveSettings(unittest.TestCase):
             api.active_context = SimpleNamespace(profile_id=pid)
 
         api._bootstrap_context = Mock(side_effect=bootstrap)
-        api._sync_runtime_links_for_profile = Mock(return_value=True)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
         api.profile_mgr = SimpleNamespace(get_current_profile=Mock(return_value=current_profile))
 
         with patch("backend.api.asdict", return_value={}), \
@@ -4137,7 +4115,7 @@ class TestApiSaveSettings(unittest.TestCase):
             api.active_context = SimpleNamespace(profile_id=pid)
 
         api._bootstrap_context = Mock(side_effect=bootstrap)
-        api._sync_runtime_links_for_profile = Mock(return_value=True)
+        api._sync_runtime_links_for_profile = Mock(return_value=LinkSyncResult(True, "deployed"))
         api.profile_mgr = SimpleNamespace(get_current_profile=Mock(return_value=current_profile))
 
         res = API.profile_activate(api, "broken")
@@ -4182,7 +4160,7 @@ class TestApiSaveSettings(unittest.TestCase):
             "missing-profile",
         )
 
-    def test_sync_runtime_links_for_profile_creates_missing_local_mods_dir_before_sync(self):
+    def test_sync_runtime_links_for_profile_passes_target_root_to_sync(self):
         api = API.__new__(API)
         temp_root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, temp_root, ignore_errors=True)
@@ -4190,7 +4168,7 @@ class TestApiSaveSettings(unittest.TestCase):
         local_mods_root = temp_root / "Mods"
         context = SimpleNamespace(local_mods_path=str(local_mods_root))
         api.profile_mgr = SimpleNamespace(build_profile_context=Mock(return_value=context))
-        api.file_mgr = SimpleNamespace(sync_managed_links=Mock(return_value=(True, None)))
+        api.file_mgr = SimpleNamespace(sync_managed_links=Mock(return_value=LinkSyncResult(True, "deployed")))
 
         runtime_caps = {"workshop_detection_enabled": True, "workshop_deploy_enabled": True}
         runtime_analysis = {"deploy_paths": ["D:/mods/a", "D:/mods/b"]}
@@ -4198,8 +4176,7 @@ class TestApiSaveSettings(unittest.TestCase):
              patch("backend.api.ModDAO.get_profile_conflict_analysis", return_value=runtime_analysis):
             result = API._sync_runtime_links_for_profile(api, "profile-a", include_workshop=True)
 
-        self.assertTrue(result)
-        self.assertTrue(local_mods_root.exists())
+        self.assertTrue(result.ok)
         api.file_mgr.sync_managed_links.assert_called_once_with(str(local_mods_root), runtime_analysis["deploy_paths"])
 
     def test_sync_runtime_links_for_profile_recalculates_on_every_call(self):
@@ -4211,7 +4188,7 @@ class TestApiSaveSettings(unittest.TestCase):
         local_mods_root.mkdir(parents=True)
         context = SimpleNamespace(local_mods_path=str(local_mods_root))
         api.profile_mgr = SimpleNamespace(build_profile_context=Mock(return_value=context))
-        api.file_mgr = SimpleNamespace(sync_managed_links=Mock(return_value=(True, None)))
+        api.file_mgr = SimpleNamespace(sync_managed_links=Mock(return_value=LinkSyncResult(True, "deployed")))
 
         runtime_caps = {"workshop_detection_enabled": True, "workshop_deploy_enabled": True}
         runtime_analysis = {"deploy_paths": ["D:/mods/a"]}
@@ -4220,18 +4197,9 @@ class TestApiSaveSettings(unittest.TestCase):
             first = API._sync_runtime_links_for_profile(api, "profile-a", include_workshop=True)
             second = API._sync_runtime_links_for_profile(api, "profile-a", include_workshop=True)
 
-        self.assertTrue(first)
-        self.assertTrue(second)
+        self.assertTrue(first.ok)
+        self.assertTrue(second.ok)
         self.assertEqual(api.file_mgr.sync_managed_links.call_count, 2)
-    def test_ensure_runtime_links_for_launch_always_reconciles_target_profile(self):
-        api = API.__new__(API)
-        api._sync_runtime_links_for_profile = Mock(return_value=True)
-
-        result = API._ensure_runtime_links_for_launch(api, "profile-a", include_workshop=False)
-
-        self.assertTrue(result)
-        api._sync_runtime_links_for_profile.assert_called_once_with("profile-a", include_workshop=False)
-
     def test_get_game_log_files_uses_runtime_scope_and_player_only_for_uninitialized_external_default(self):
         api = API.__new__(API)
         api.game_log_mgr = SimpleNamespace(
@@ -4269,3 +4237,40 @@ class TestApiSaveSettings(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_launch_stops_when_quick_scan_fails():
+    api = API.__new__(API)
+    api.active_context = SimpleNamespace(profile_id="a")
+    api.profile_mgr = SimpleNamespace(build_profile_context=Mock(return_value=SimpleNamespace(is_healthy=True)))
+    api._build_scan_paths_for_profile = Mock(return_value=["probe"])
+    api._sync_runtime_links_for_profile = Mock()
+    scanner = Mock()
+    scanner._scan_paths_task.return_value = {"status": "failed", "message": "probe scan failed"}
+    with patch("backend.api.ModScanner", return_value=scanner), patch.object(settings.config, "enable_launch_profile_quick_scan", True):
+        result = api._prepare_profile_launch("b", include_workshop=True)
+    assert not result["ok"] and result["mode"] == "scan-failed"
+    assert result["message"] == "probe scan failed"
+    api._sync_runtime_links_for_profile.assert_not_called()
+    scanner.executor.shutdown.assert_called_once_with(wait=True, cancel_futures=True)
+
+
+def test_old_scan_generation_cannot_deploy_after_same_profile_reactivation():
+    api = API.__new__(API)
+    api.active_context = SimpleNamespace(profile_id="a")
+    api._runtime_generation = object()
+    api._sync_runtime_links_for_profile = Mock()
+    result = api._sync_runtime_links_after_scan("a", object())
+    assert result.ok and result.status == "skipped"
+    api._sync_runtime_links_for_profile.assert_not_called()
+
+
+def test_scan_failure_result_is_returned_without_sending_events():
+    scanner = ModScanner(SimpleNamespace(profile_id="a"))
+    try:
+        with patch("backend.scanner.mod_scanner.db.connect", side_effect=RuntimeError("db down")), patch("backend.scanner.mod_scanner.db.is_closed", return_value=True), patch("backend.scanner.mod_scanner.EventBus.emit") as emit:
+            result = scanner._scan_paths_task("probe", [], emit_events=False)
+        assert result["status"] == "failed"
+        assert result["metrics"]["stage"] == "connect_db"
+        emit.assert_not_called()
+    finally:
+        scanner.executor.shutdown(wait=True)

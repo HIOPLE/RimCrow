@@ -19,6 +19,31 @@ from backend.paths.game_locations import (
 from backend.settings import settings
 
 
+class TestSteamcmdStorageLock(unittest.TestCase):
+    def test_queued_workers_refresh_paths_before_running_batch(self):
+        for run in (SteamManager._run_steamcmd_process, SteamManager._run_steamcmd_workshop_repair_process):
+            with self.subTest(worker=run.__name__):
+                manager = Mock(spec=SteamManager)
+                manager.steamcmd_dir = "old"
+                manager._steamcmd_lock = threading.Lock()
+                manager._steamcmd_processes = {}
+                manager._steamcmd_cancelled = set()
+                manager._is_steamcmd_task_cancelled.return_value = False
+                calls = []
+                def reload():
+                    calls.append("reload")
+                    manager.steamcmd_dir = "new"
+                def batch(**kwargs):
+                    calls.append("batch")
+                    self.assertEqual(kwargs["workshop_log_path"], Path("new/logs/workshop_log.txt"))
+                    raise OSError("stop before process launch")
+                manager.reload_paths_from_settings.side_effect = reload
+                manager._run_single_steamcmd_batch.side_effect = batch
+                run(manager, ["1001"], "probe")
+                self.assertEqual(calls, ["reload", "batch"])
+                manager.reload_paths_from_settings.assert_called_once_with()
+
+
 class TestSteamActionReadiness(unittest.TestCase):
     def make_manager(self):
         manager = object.__new__(SteamManager)

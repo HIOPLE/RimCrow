@@ -1064,8 +1064,42 @@ for (const test of [
   testModInventoryTasksScanAndReplaceListState,
   testQueuedReplaceScanOverridesPreserveScan,
   testScanTaskDoesNotGuessFailureFromElapsedTime,
+  testScanWarnsWhenLinkDeploymentFails,
 ]) {
   await test()
 }
 
 print('refreshActions.test.mjs passed')
+
+async function testScanWarnsWhenLinkDeploymentFails() {
+  resetStores({
+    get_startup_bootstrap: async () => ok({
+      settings: { enable_auto_scan: false, ui: {} },
+      active_context: context({ is_healthy: false }), user_themes: [], upgrade_context: {},
+    }),
+    get_mod_list_core: async () => ok({ groups: [], all_mods: [], active_load_order: [], inactive_load_order: [] }),
+    monitor_frontend_ready: async () => ok(),
+  })
+  const appStore = useAppStore()
+  await appStore.initialize()
+  const originalWarning = toast.warning
+  const originalSuccess = toast.success
+  const warnings = [], successes = []
+  toast.warning = message => warnings.push(message)
+  toast.success = message => successes.push(message)
+  try {
+    await window.dispatchEvent({ type: 'scan-complete', detail: {
+      task_id: 'scan-link-failure', status: 'success', stats: {}, core_refresh_required: false,
+      runtime_sync: { ok: false, status: 'failed', message: 'PROBE_LINK_LOCKED' },
+    } })
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /PROBE_LINK_LOCKED/)
+    assert.equal(successes.length, 0)
+    const task = useTaskStore().getTask('scan-link-failure')
+    assert.equal(task.metrics.runtime_sync.ok, false)
+    assert.notEqual(task.message, '扫描完成')
+  } finally {
+    toast.warning = originalWarning
+    toast.success = originalSuccess
+  }
+}

@@ -696,16 +696,10 @@
       "invalid_launch_warning_action": "无效的启动确认动作",
       "launch_after_steam_exit": "Steam 已退出，已发起游戏启动，等待游戏进程确认。",
       "launch_cancelled": "已取消启动",
-      "launch_prepare_active_done": "当前活动环境已完成启动前检查同步。",
-      "launch_prepare_active_failed": "当前活动环境启动前检查同步失败。",
-      "launch_prepare_cache_sync_done": "已按当前缓存状态完成启动前检查同步。",
-      "launch_prepare_cache_sync_failed": "按当前缓存执行启动前检查同步失败。",
       "launch_prepare_failed": "启动前准备失败。请检查当前环境路径、文件权限和模组链接状态。",
       "launch_prepare_missing_context": "无法构建目标环境上下文，请检查环境是否存在。",
       "launch_prepare_missing_scan_paths": "目标环境没有可用于启动前检查同步的模组路径。",
-      "launch_prepare_no_context_builder": "缺少环境上下文构建器，已跳过启动前检查同步。",
-      "launch_prepare_scan_sync_done": "已完成启动前检查同步，并按最新扫描结果更新链接。",
-      "launch_prepare_scan_sync_failed": "启动前检查同步已完成扫描，但链接同步失败。",
+      "launch_prepare_scan_failed": "启动前扫描未完成，已停止启动游戏。",
       "launch_prepare_sync_failed": "启动前同步失败",
       "launch_prepare_unhealthy_context": "目标环境路径不可用，请先完成路径设置。",
       "steam_launch_failed": "无法提交 Steam 启动请求。",
@@ -4421,6 +4415,7 @@
       "queued": "任务已加入后台队列",
       "scan_complete": "扫描完成",
       "scan_interrupted_by_suspend": "扫描因界面挂起而中断，请重新刷新。",
+      "scan_link_sync_failed": "扫描完成，但模组链接同步失败",
       "texture_task": "贴图任务"
     },
     "mod_package": {
@@ -4753,6 +4748,7 @@
       "scan_done_with_restore_warning": "扫描已完成，共扫描 {total} 个模组，新增 {added} 个，更新 {updated} 个，删除 {removed} 个，已知 {skipped} 个。\n{extra}",
       "scan_external_enabled_count": "外部解除禁用 {count} 个",
       "scan_failed": "扫描异常。可能是路径权限、文件占用或扫描器内部状态暂时不可用。",
+      "scan_link_sync_failed": "扫描完成，但模组链接同步失败，游戏可能无法加载当前模组。\n{reason}",
       "scan_request_failed": "扫描请求异常。可能是软件后端暂时不可用或当前环境路径配置异常。",
       "scan_start_failed": "扫描启动失败。可能是当前环境路径无效、扫描器未初始化或后台任务暂时不可用。",
       "scan_strict_restore_failed_count": "恢复失败 {count} 个",
@@ -4876,8 +4872,7 @@
       },
       "save_failed": "保存设置失败。可能是后端服务暂时不可用、配置文件无法写入或当前路径权限不足，请稍后重试。",
       "secret_storage_warning": "部分密钥暂时无法写入本机安全存储，已临时保留在配置文件中。请检查系统凭据服务后重新保存密钥。",
-      "self_mods_path_reset": "管理器下载模组路径不能与创意工坊目录相同，已自动恢复为默认目录。",
-      "steamcmd_junction_sync_failed": "当前磁盘无法连接 SteamCMD 下载目录，已保留你的管理器下载目录设置，但 SteamCMD 下载的模组不会自动出现在管理器目录中。请改用 NTFS 磁盘，或将管理器下载模组路径设为：{path}"
+      "self_mods_path_reset": "管理器下载模组路径不能与创意工坊目录相同，已自动恢复为默认目录。"
     },
     "startup": {
       "auxiliary_warmup_failed": "部分后台数据暂时未能预热，相关提示可能稍后才会出现。",

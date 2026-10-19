@@ -1444,90 +1444,95 @@ class SteamManager:
         return current_env
 
     def _run_steamcmd_workshop_repair_process(self, mod_ids: list[str], task_id: str, on_success=None):
-        task_type = "steamcmd-workshop-repair"
-        current_env = self._build_steamcmd_process_env()
-        target_dir = settings.config.workshop_mods_path
-        total_items = len(mod_ids)
-        self._emit_progress_event(task_id, "正在通过 SteamCMD 下载补救内容...", 0, TaskStatus.RUNNING, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=mod_ids)
+        from backend.managers.mgr_files import FileManager
 
-        completed_ids: set[str] = set()
-        failed_ids: set[str] = set()
-        current_item_idx = 0
-        batch_list = [mod_ids[i:i + STEAMCMD_DOWNLOAD_BATCH_SIZE] for i in range(0, total_items, STEAMCMD_DOWNLOAD_BATCH_SIZE)]
-        workshop_log_path = Path(self.steamcmd_dir) / "logs" / "workshop_log.txt"
-        debug_show_console = platform.system() == "Windows" and bool(settings.config.debug_mode)
+        with FileManager.storage_lock:
+            task_type = "steamcmd-workshop-repair"
+            current_env = self._build_steamcmd_process_env()
+            target_dir = settings.config.workshop_mods_path
+            total_items = len(mod_ids)
+            self._emit_progress_event(task_id, "正在通过 SteamCMD 下载补救内容...", 0, TaskStatus.RUNNING, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=mod_ids)
 
-        try:
-            for batch in batch_list:
+            completed_ids: set[str] = set()
+            failed_ids: set[str] = set()
+            current_item_idx = 0
+            batch_list = [mod_ids[i:i + STEAMCMD_DOWNLOAD_BATCH_SIZE] for i in range(0, total_items, STEAMCMD_DOWNLOAD_BATCH_SIZE)]
+            debug_show_console = platform.system() == "Windows" and bool(settings.config.debug_mode)
+
+            try:
+                # 排队期间路径可能已切换，取得存储锁后再读取实际执行路径。
+                self.reload_paths_from_settings()
+                workshop_log_path = Path(self.steamcmd_dir) / "logs" / "workshop_log.txt"
+                for batch in batch_list:
+                    if self._is_steamcmd_task_cancelled(task_id):
+                        self._emit_progress_event(task_id, "SteamCMD 补救下载已取消", int((current_item_idx / max(total_items, 1)) * 60), TaskStatus.CANCELLED, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=mod_ids)
+                        return
+
+                    current_item_idx_ref = [current_item_idx]
+                    batch_result = self._run_single_steamcmd_batch(
+                        batch=batch,
+                        task_id=task_id,
+                        current_env=current_env,
+                        completed_ids=completed_ids,
+                        failed_ids=failed_ids,
+                        current_item_idx_ref=current_item_idx_ref,
+                        total_items=total_items,
+                        workshop_log_path=workshop_log_path,
+                        target_dir=target_dir,
+                        debug_show_console=debug_show_console,
+                        task_type=task_type,
+                        final_download_status=TaskStatus.RUNNING,
+                    )
+                    current_item_idx = current_item_idx_ref[0]
+                    if batch_result.get("batch_failed"):
+                        retry_ids = [item_id for item_id in batch if item_id not in completed_ids]
+                        if retry_ids:
+                            self._retry_steamcmd_batch(
+                                retry_ids=retry_ids,
+                                task_id=task_id,
+                                current_env=current_env,
+                                completed_ids=completed_ids,
+                                failed_ids=failed_ids,
+                                current_item_idx_ref=current_item_idx_ref,
+                                total_items=total_items,
+                                workshop_log_path=workshop_log_path,
+                                target_dir=target_dir,
+                                debug_show_console=debug_show_console,
+                                task_type=task_type,
+                                final_download_status=TaskStatus.RUNNING,
+                            )
+                            current_item_idx = current_item_idx_ref[0]
+
                 if self._is_steamcmd_task_cancelled(task_id):
                     self._emit_progress_event(task_id, "SteamCMD 补救下载已取消", int((current_item_idx / max(total_items, 1)) * 60), TaskStatus.CANCELLED, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=mod_ids)
                     return
+                repair_ids = [item_id for item_id in mod_ids if item_id in completed_ids and item_id not in failed_ids]
+                if not repair_ids:
+                    self._emit_progress_event(task_id, "SteamCMD 补救下载失败", int((current_item_idx / max(total_items, 1)) * 60), TaskStatus.ERROR, target_dir, "SteamCMD 补救下载", error="没有成功下载的工坊项", task_type=task_type, targets=mod_ids)
+                    return
 
-                current_item_idx_ref = [current_item_idx]
-                batch_result = self._run_single_steamcmd_batch(
-                    batch=batch,
-                    task_id=task_id,
-                    current_env=current_env,
-                    completed_ids=completed_ids,
-                    failed_ids=failed_ids,
-                    current_item_idx_ref=current_item_idx_ref,
-                    total_items=total_items,
-                    workshop_log_path=workshop_log_path,
-                    target_dir=target_dir,
-                    debug_show_console=debug_show_console,
-                    task_type=task_type,
-                    final_download_status=TaskStatus.RUNNING,
-                )
-                current_item_idx = current_item_idx_ref[0]
-                if batch_result.get("batch_failed"):
-                    retry_ids = [item_id for item_id in batch if item_id not in completed_ids]
-                    if retry_ids:
-                        self._retry_steamcmd_batch(
-                            retry_ids=retry_ids,
-                            task_id=task_id,
-                            current_env=current_env,
-                            completed_ids=completed_ids,
-                            failed_ids=failed_ids,
-                            current_item_idx_ref=current_item_idx_ref,
-                            total_items=total_items,
-                            workshop_log_path=workshop_log_path,
-                            target_dir=target_dir,
-                            debug_show_console=debug_show_console,
-                            task_type=task_type,
-                            final_download_status=TaskStatus.RUNNING,
-                        )
-                        current_item_idx = current_item_idx_ref[0]
+                self._emit_progress_event(task_id, "正在覆盖 Steam 工坊文件并同步记录...", 70, TaskStatus.RUNNING, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=repair_ids)
+                result = self._apply_steamcmd_repair_items(repair_ids, task_id, task_type)
+                repaired_ids = result["repaired_ids"]
+                failed_repair_ids = sorted(set(mod_ids) - set(repaired_ids))
+                if failed_repair_ids:
+                    failed_text = ", ".join(failed_repair_ids[:5]) + (" ..." if len(failed_repair_ids) > 5 else "")
+                    self._emit_progress_event(task_id, "SteamCMD 补救下载未全部完成", 95, TaskStatus.ERROR, target_dir, "SteamCMD 补救下载", error=f"失败项: {failed_text}", task_type=task_type, targets=mod_ids)
+                    return
 
-            if self._is_steamcmd_task_cancelled(task_id):
-                self._emit_progress_event(task_id, "SteamCMD 补救下载已取消", int((current_item_idx / max(total_items, 1)) * 60), TaskStatus.CANCELLED, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=mod_ids)
-                return
-            repair_ids = [item_id for item_id in mod_ids if item_id in completed_ids and item_id not in failed_ids]
-            if not repair_ids:
-                self._emit_progress_event(task_id, "SteamCMD 补救下载失败", int((current_item_idx / max(total_items, 1)) * 60), TaskStatus.ERROR, target_dir, "SteamCMD 补救下载", error="没有成功下载的工坊项", task_type=task_type, targets=mod_ids)
-                return
-
-            self._emit_progress_event(task_id, "正在覆盖 Steam 工坊文件并同步记录...", 70, TaskStatus.RUNNING, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=repair_ids)
-            result = self._apply_steamcmd_repair_items(repair_ids, task_id, task_type)
-            repaired_ids = result["repaired_ids"]
-            failed_repair_ids = sorted(set(mod_ids) - set(repaired_ids))
-            if failed_repair_ids:
-                failed_text = ", ".join(failed_repair_ids[:5]) + (" ..." if len(failed_repair_ids) > 5 else "")
-                self._emit_progress_event(task_id, "SteamCMD 补救下载未全部完成", 95, TaskStatus.ERROR, target_dir, "SteamCMD 补救下载", error=f"失败项: {failed_text}", task_type=task_type, targets=mod_ids)
-                return
-
-            self._emit_progress_event(task_id, f"补救下载完成 ({len(repaired_ids)})", 100, TaskStatus.COMPLETED, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=repaired_ids)
-            if callable(on_success):
-                try:
-                    on_success()
-                except Exception as refresh_error:
-                    logger.warning(f"SteamCMD 补救下载完成后自动刷新失败: {refresh_error}")
-        except Exception as e:
-            logger.error(f"SteamCMD 补救下载失败：{e}", exc_info=True)
-            self._emit_progress_event(task_id, "SteamCMD 补救下载失败，请检查 SteamCMD、工坊目录、Steam 工坊记录文件权限和磁盘空间。", 0, TaskStatus.ERROR, target_dir, "SteamCMD 补救下载", error=str(e), task_type=task_type, targets=mod_ids)
-        finally:
-            with self._steamcmd_lock:
-                self._steamcmd_processes.pop(task_id, None)
-                self._steamcmd_cancelled.discard(task_id)
+                self._emit_progress_event(task_id, f"补救下载完成 ({len(repaired_ids)})", 100, TaskStatus.COMPLETED, target_dir, "SteamCMD 补救下载", task_type=task_type, targets=repaired_ids)
+                if callable(on_success):
+                    try:
+                        on_success()
+                    except Exception as refresh_error:
+                        logger.warning(f"SteamCMD 补救下载完成后自动刷新失败: {refresh_error}")
+            except Exception as e:
+                logger.error(f"SteamCMD 补救下载失败：{e}", exc_info=True)
+                self._emit_progress_event(task_id, "SteamCMD 补救下载失败，请检查 SteamCMD、工坊目录、Steam 工坊记录文件权限和磁盘空间。", 0, TaskStatus.ERROR, target_dir, "SteamCMD 补救下载", error=str(e), task_type=task_type, targets=mod_ids)
+            finally:
+                with self._steamcmd_lock:
+                    self._steamcmd_processes.pop(task_id, None)
+                    self._steamcmd_cancelled.discard(task_id)
 
     def _apply_steamcmd_repair_items(self, workshop_ids: list[str], task_id: str, task_type: str) -> dict[str, Any]:
         if self.is_steam_running():
@@ -1673,112 +1678,116 @@ class SteamManager:
         self._last_ws_acf_mtime = 0
 
     def _run_steamcmd_process(self, mod_ids, task_id, on_success=None):
-        current_env = self._build_steamcmd_process_env()
+        from backend.managers.mgr_files import FileManager
 
-        target_dir = settings.config.steamcmd_mods_path
-        total_items = len(mod_ids)
-        self._emit_progress_event(task_id, "正在连接 Steam 服务器...", 0, TaskStatus.RUNNING, target_dir, "SteamCMD", task_type="steamcmd-download")
+        with FileManager.storage_lock:
+            current_env = self._build_steamcmd_process_env()
 
-        completed_ids: set[str] = set()
-        failed_ids: set[str] = set()
-        current_item_idx = 0
-        batch_list = [mod_ids[i:i + STEAMCMD_DOWNLOAD_BATCH_SIZE] for i in range(0, total_items, STEAMCMD_DOWNLOAD_BATCH_SIZE)]
-        workshop_log_path = Path(self.steamcmd_dir) / "logs" / "workshop_log.txt"
-        debug_show_console = platform.system() == "Windows" and bool(settings.config.debug_mode)
+            target_dir = settings.config.steamcmd_mods_path
+            total_items = len(mod_ids)
+            self._emit_progress_event(task_id, "正在连接 Steam 服务器...", 0, TaskStatus.RUNNING, target_dir, "SteamCMD", task_type="steamcmd-download")
 
-        try:
-            for batch in batch_list:
+            completed_ids: set[str] = set()
+            failed_ids: set[str] = set()
+            current_item_idx = 0
+            batch_list = [mod_ids[i:i + STEAMCMD_DOWNLOAD_BATCH_SIZE] for i in range(0, total_items, STEAMCMD_DOWNLOAD_BATCH_SIZE)]
+            debug_show_console = platform.system() == "Windows" and bool(settings.config.debug_mode)
+
+            try:
+                self.reload_paths_from_settings()
+                workshop_log_path = Path(self.steamcmd_dir) / "logs" / "workshop_log.txt"
+                for batch in batch_list:
+                    if self._is_steamcmd_task_cancelled(task_id):
+                        self._emit_progress_event(
+                            task_id,
+                            "SteamCMD 下载已取消",
+                            int((current_item_idx / max(total_items, 1)) * 100),
+                            TaskStatus.CANCELLED,
+                            target_dir,
+                            "SteamCMD",
+                            task_type="steamcmd-download",
+                        )
+                        return
+
+                    current_item_idx_ref = [current_item_idx]
+                    batch_result = self._run_single_steamcmd_batch(
+                        batch=batch,
+                        task_id=task_id,
+                        current_env=current_env,
+                        completed_ids=completed_ids,
+                        failed_ids=failed_ids,
+                        current_item_idx_ref=current_item_idx_ref,
+                        total_items=total_items,
+                        workshop_log_path=workshop_log_path,
+                        target_dir=target_dir,
+                        debug_show_console=debug_show_console,
+                    )
+                    current_item_idx = current_item_idx_ref[0]
+                    batch_failed = bool(batch_result.get("batch_failed", False))
+                    if batch_failed:
+                        retry_ids = [item_id for item_id in batch if item_id not in completed_ids]
+                        if retry_ids:
+                            self._retry_steamcmd_batch(
+                                retry_ids=retry_ids,
+                                task_id=task_id,
+                                current_env=current_env,
+                                completed_ids=completed_ids,
+                                failed_ids=failed_ids,
+                                current_item_idx_ref=current_item_idx_ref,
+                                total_items=total_items,
+                                workshop_log_path=workshop_log_path,
+                                target_dir=target_dir,
+                                debug_show_console=debug_show_console,
+                            )
+                            current_item_idx = current_item_idx_ref[0]
+
                 if self._is_steamcmd_task_cancelled(task_id):
+                    self._emit_progress_event(task_id, tr("tasks.steamcmd.download.cancelled", "SteamCMD 下载已取消"), int((current_item_idx / max(total_items, 1)) * 100), TaskStatus.CANCELLED, target_dir, "SteamCMD", task_type="steamcmd-download")
+                elif failed_ids:
+                    failed_text = ", ".join(sorted(failed_ids)[:5])
+                    if len(failed_ids) > 5:
+                        failed_text += " ..."
                     self._emit_progress_event(
                         task_id,
-                        "SteamCMD 下载已取消",
+                        tr("tasks.steamcmd.download.failed_progress", "SteamCMD 下载失败 ({current}/{total})", current=current_item_idx, total=total_items),
                         int((current_item_idx / max(total_items, 1)) * 100),
-                        TaskStatus.CANCELLED,
+                        TaskStatus.ERROR,
                         target_dir,
                         "SteamCMD",
+                        error=str(tr("tasks.steamcmd.download.failed_items", "失败项: {items}", items=failed_text)),
                         task_type="steamcmd-download",
                     )
-                    return
+                elif current_item_idx >= total_items:
+                    self._emit_progress_event(task_id, tr("tasks.steamcmd.download.complete", "全部下载完成 ({total})", total=total_items), 100, TaskStatus.COMPLETED, target_dir, "SteamCMD", task_type="steamcmd-download")
+                    if callable(on_success):
+                        try:
+                            on_success()
+                        except Exception as refresh_error:
+                            logger.warning(f"SteamCMD 下载完成后自动刷新失败: {refresh_error}")
+                else:
+                    pending_count = max(total_items - current_item_idx, 0)
+                    pending_ids = [item_id for item_id in mod_ids if item_id not in completed_ids][:5]
+                    pending_text = ", ".join(pending_ids)
+                    if pending_count > 5:
+                        pending_text += " ..."
+                    self._emit_progress_event(
+                        task_id,
+                        tr("tasks.steamcmd.download.failed_progress", "SteamCMD 下载失败 ({current}/{total})", current=current_item_idx, total=total_items),
+                        int((current_item_idx / max(total_items, 1)) * 100),
+                        TaskStatus.ERROR,
+                        target_dir,
+                        "SteamCMD",
+                        error=str(tr("tasks.steamcmd.download.pending_items", "未完成项: {items}", items=pending_text or pending_count)),
+                        task_type="steamcmd-download",
+                    )
 
-                current_item_idx_ref = [current_item_idx]
-                batch_result = self._run_single_steamcmd_batch(
-                    batch=batch,
-                    task_id=task_id,
-                    current_env=current_env,
-                    completed_ids=completed_ids,
-                    failed_ids=failed_ids,
-                    current_item_idx_ref=current_item_idx_ref,
-                    total_items=total_items,
-                    workshop_log_path=workshop_log_path,
-                    target_dir=target_dir,
-                    debug_show_console=debug_show_console,
-                )
-                current_item_idx = current_item_idx_ref[0]
-                batch_failed = bool(batch_result.get("batch_failed", False))
-                if batch_failed:
-                    retry_ids = [item_id for item_id in batch if item_id not in completed_ids]
-                    if retry_ids:
-                        self._retry_steamcmd_batch(
-                            retry_ids=retry_ids,
-                            task_id=task_id,
-                            current_env=current_env,
-                            completed_ids=completed_ids,
-                            failed_ids=failed_ids,
-                            current_item_idx_ref=current_item_idx_ref,
-                            total_items=total_items,
-                            workshop_log_path=workshop_log_path,
-                            target_dir=target_dir,
-                            debug_show_console=debug_show_console,
-                        )
-                        current_item_idx = current_item_idx_ref[0]
-
-            if self._is_steamcmd_task_cancelled(task_id):
-                self._emit_progress_event(task_id, tr("tasks.steamcmd.download.cancelled", "SteamCMD 下载已取消"), int((current_item_idx / max(total_items, 1)) * 100), TaskStatus.CANCELLED, target_dir, "SteamCMD", task_type="steamcmd-download")
-            elif failed_ids:
-                failed_text = ", ".join(sorted(failed_ids)[:5])
-                if len(failed_ids) > 5:
-                    failed_text += " ..."
-                self._emit_progress_event(
-                    task_id,
-                    tr("tasks.steamcmd.download.failed_progress", "SteamCMD 下载失败 ({current}/{total})", current=current_item_idx, total=total_items),
-                    int((current_item_idx / max(total_items, 1)) * 100),
-                    TaskStatus.ERROR,
-                    target_dir,
-                    "SteamCMD",
-                    error=str(tr("tasks.steamcmd.download.failed_items", "失败项: {items}", items=failed_text)),
-                    task_type="steamcmd-download",
-                )
-            elif current_item_idx >= total_items:
-                self._emit_progress_event(task_id, tr("tasks.steamcmd.download.complete", "全部下载完成 ({total})", total=total_items), 100, TaskStatus.COMPLETED, target_dir, "SteamCMD", task_type="steamcmd-download")
-                if callable(on_success):
-                    try:
-                        on_success()
-                    except Exception as refresh_error:
-                        logger.warning(f"SteamCMD 下载完成后自动刷新失败: {refresh_error}")
-            else:
-                pending_count = max(total_items - current_item_idx, 0)
-                pending_ids = [item_id for item_id in mod_ids if item_id not in completed_ids][:5]
-                pending_text = ", ".join(pending_ids)
-                if pending_count > 5:
-                    pending_text += " ..."
-                self._emit_progress_event(
-                    task_id,
-                    tr("tasks.steamcmd.download.failed_progress", "SteamCMD 下载失败 ({current}/{total})", current=current_item_idx, total=total_items),
-                    int((current_item_idx / max(total_items, 1)) * 100),
-                    TaskStatus.ERROR,
-                    target_dir,
-                    "SteamCMD",
-                    error=str(tr("tasks.steamcmd.download.pending_items", "未完成项: {items}", items=pending_text or pending_count)),
-                    task_type="steamcmd-download",
-                )
-
-        except Exception as e:
-            logger.error(f"SteamCMD 执行失败：{e}", exc_info=True)
-            self._emit_progress_event(task_id, tr("errors.steamcmd.execution_failed_with_target", "SteamCMD 执行失败，请检查 Steam 安装、网络连接和下载目录权限。"), 0, TaskStatus.ERROR, target_dir, "SteamCMD", task_type="steamcmd-download")
-        finally:
-            with self._steamcmd_lock:
-                self._steamcmd_processes.pop(task_id, None)
-                self._steamcmd_cancelled.discard(task_id)
+            except Exception as e:
+                logger.error(f"SteamCMD 执行失败：{e}", exc_info=True)
+                self._emit_progress_event(task_id, tr("errors.steamcmd.execution_failed_with_target", "SteamCMD 执行失败，请检查 Steam 安装、网络连接和下载目录权限。"), 0, TaskStatus.ERROR, target_dir, "SteamCMD", task_type="steamcmd-download")
+            finally:
+                with self._steamcmd_lock:
+                    self._steamcmd_processes.pop(task_id, None)
+                    self._steamcmd_cancelled.discard(task_id)
 
     def _run_single_steamcmd_batch(
         self,

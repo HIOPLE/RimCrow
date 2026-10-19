@@ -1137,12 +1137,14 @@ export const useAppStore = defineStore('app', () => {
           type: 'scan',
           status: String(detail.status || 'success'),
           progress: Number(detail.progress ?? (detail.status === 'success' ? 100 : 0)),
-          message: translateMessagePayload(detail, detail.status === 'success' ? t('tasks.message.scan_complete', '扫描完成') : ''),
+          message: detail.runtime_sync?.ok === false
+            ? t('tasks.message.scan_link_sync_failed', '扫描完成，但模组链接同步失败')
+            : translateMessagePayload(detail, detail.status === 'success' ? t('tasks.message.scan_complete', '扫描完成') : ''),
           metrics: {
             title: t('tasks.type.scan', '模组扫描'),
             ...(detail.metrics || {}),
             ...(detail.stats ? { stats: detail.stats } : {}),
-            ...(detail.runtime_sync_message ? { runtime_sync_message: detail.runtime_sync_message } : {}),
+            ...(detail.runtime_sync ? { runtime_sync: detail.runtime_sync } : {}),
           },
           timestamp: Date.now(),
         })
