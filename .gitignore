@@ -13,9 +13,6 @@ updates/
 !doc/en/
 !doc/en/*.md
 .*/
-!.github/
-!.github/workflows/
-!.github/workflows/*.yml
 .worktrees/
 tools/
 *.bat
