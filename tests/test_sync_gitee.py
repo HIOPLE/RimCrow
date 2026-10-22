@@ -221,12 +221,13 @@ def test_release_create_update_and_verify_upload(tmp_path, monkeypatch, existing
     monkeypatch.setattr(sync, "api_request", api)
     monkeypatch.setattr(sync, "list_pages", MagicMock(return_value=[{"id": 3, "name": NAME, "browser_download_url": "https://gitee.com/download/package.zip"}]))
     monkeypatch.setattr(sync, "download_hash", MagicMock(return_value=DIGEST))
-    release = {"tag_name": TAG, "body": "$(do not execute)", "name": "Release"}
+    release = {"tag_name": TAG, "body": "$(do not execute)", "name": "Release",
+               "target_commitish": "main"}
     sync.sync_release(MagicMock(), release, [(path, DIGEST)], existing, False)
     assert api.call_args_list[0].args[1] == ("PATCH" if existing else "POST")
     assert api.call_args_list[0].kwargs["data"]["body"] == "$(do not execute)"
     assert api.call_args_list[0].kwargs["data"]["prerelease"] is False
-    assert "target_commitish" not in api.call_args_list[0].kwargs["data"]
+    assert api.call_args_list[0].kwargs["data"]["target_commitish"] == "main"
     assert api.call_args_list[1].args[3] == "/releases/2/attach_files"
     assert sync.download_hash.call_count == 1
     assert sync.download_hash.call_args.args[0] == "https://gitee.com/download/package.zip"
